@@ -1,4 +1,5 @@
 import customtkinter as ctk
+import banco
 
 
 class TelaDashboardProfissional:
@@ -16,17 +17,22 @@ class TelaDashboardProfissional:
     COR_ALERTA_FUNDO = "#fff5f5"
     COR_OK = "#2f855a"
     COR_OK_FUNDO = "#f0fff4"
+    COR_SEM_DADOS = "#718096"
+    COR_SEM_DADOS_FUNDO = "#edf2f7"
+    COR_DEMO = "#975a16"
+    COR_DEMO_FUNDO = "#fffaf0"
 
-    # Limites de exemplo para gerar os alertas (podem ser ajustados)
+    # Limites usados apenas para sinalizar dados registrados no sistema.
+    # Eles não substituem avaliação clínica nem orientação profissional.
     LIMITE_PA_SISTOLICA = 140
     LIMITE_PA_DIASTOLICA = 90
     LIMITE_BPM = 100
     LIMITE_SPO2 = 95
     LIMITE_FEBRE = 37.8
 
-    # Dados de exemplo (depois podem vir de um banco de dados)
-    # pa_sis/pa_dia = pressão arterial, bpm = batimentos, spo2 = oxigênio (%), temp = temperatura (°C)
-    PACIENTES = [
+    # Pacientes fictícias usadas somente quando ainda não há gestantes cadastradas.
+    # pa_sis/pa_dia = pressão arterial, bpm = batimentos, spo2 = oxigênio (%), temp = temperatura (°C).
+    PACIENTES_DEMO = [
         {"nome": "Ana Souza", "semanas": 24, "consulta": "22/10 14:00", "bpm": 78, "pa_sis": 110, "pa_dia": 70, "spo2": 98, "temp": 36.6},
         {"nome": "Beatriz Lima", "semanas": 32, "consulta": "Hoje 09:30", "bpm": 84, "pa_sis": 145, "pa_dia": 95, "spo2": 97, "temp": 36.8},
         {"nome": "Carla Mendes", "semanas": 12, "consulta": "24/10 11:00", "bpm": 72, "pa_sis": 105, "pa_dia": 65, "spo2": 99, "temp": 36.5},
@@ -35,36 +41,42 @@ class TelaDashboardProfissional:
         {"nome": "Fernanda Alves", "semanas": 20, "consulta": "27/10 08:00", "bpm": 76, "pa_sis": 108, "pa_dia": 68, "spo2": 98, "temp": 36.6},
     ]
 
-    def avaliar_paciente(self, paciente):
-        """Compara os sinais vitais com os limites e devolve a lista de motivos de alerta"""
-        motivos = []
-        if paciente["pa_sis"] >= self.LIMITE_PA_SISTOLICA or paciente["pa_dia"] >= self.LIMITE_PA_DIASTOLICA:
-            motivos.append(f'Pressão arterial elevada: {paciente["pa_sis"]}/{paciente["pa_dia"]} mmHg')
-        if paciente["bpm"] > self.LIMITE_BPM:
-            motivos.append(f'Frequência cardíaca alta: {paciente["bpm"]} bpm')
-        if paciente["spo2"] < self.LIMITE_SPO2:
-            motivos.append(f'Oxigenação baixa: {paciente["spo2"]}%')
-        if paciente["temp"] >= self.LIMITE_FEBRE:
-            motivos.append(f'Febre: {str(paciente["temp"]).replace(".", ",")} °C')
-        return motivos
-
-    def preparar_pacientes(self):
-        """Define o status (Normal/Alerta) e o motivo de cada paciente automaticamente"""
-        for paciente in self.PACIENTES:
-            motivos = self.avaliar_paciente(paciente)
-            paciente["status"] = "Alerta" if motivos else "Normal"
-            paciente["motivo"] = "; ".join(motivos)
-
     def __init__(self, master):
         self.master = master
+
+        # Usa os cadastros reais sempre que houver gestantes no banco.
+        # Se ainda não houver nenhuma, mantém a demonstração que já existia.
+        usuarios_cadastrados = banco.listar_usuarios("gestante")
+        self.modo_demo = not bool(usuarios_cadastrados)
+
+        if self.modo_demo:
+            self.PACIENTES = [
+                paciente.copy()
+                for paciente in self.PACIENTES_DEMO
+            ]
+        else:
+            self.PACIENTES = [
+                self._normalizar_paciente(usuario)
+                for usuario in usuarios_cadastrados
+            ]
+
         self.preparar_pacientes()
 
         # Container principal
-        self.container_geral = ctk.CTkFrame(self.master, fg_color=self.COR_FUNDO, corner_radius=0)
+        self.container_geral = ctk.CTkFrame(
+            self.master,
+            fg_color=self.COR_FUNDO,
+            corner_radius=0,
+        )
         self.container_geral.pack(fill="both", expand=True)
 
         # 1. MENU LATERAL
-        self.menu_lateral = ctk.CTkFrame(self.container_geral, width=200, fg_color=self.COR_MENU, corner_radius=0)
+        self.menu_lateral = ctk.CTkFrame(
+            self.container_geral,
+            width=200,
+            fg_color=self.COR_MENU,
+            corner_radius=0,
+        )
         self.menu_lateral.pack(side="left", fill="y")
         self.menu_lateral.pack_propagate(False)
 
@@ -72,18 +84,25 @@ class TelaDashboardProfissional:
             self.menu_lateral,
             text="Farmar Baby",
             font=("Arial", 22, "bold"),
-            text_color="white"
+            text_color="white",
         ).pack(pady=(30, 0))
+
         ctk.CTkLabel(
             self.menu_lateral,
             text="Painel Profissional",
             font=("Arial", 12),
-            text_color=self.COR_TEXTO_MENU
+            text_color=self.COR_TEXTO_MENU,
         ).pack(pady=(0, 30))
 
-        self.btn_pacientes = self.criar_botao_menu("👥 Pacientes", "pacientes")
-        self.btn_alertas = self.criar_botao_menu("⚠️ Alertas", "alertas")
-        self.btn_agenda = self.criar_botao_menu("📅 Agenda do Dia", "agenda")
+        self.btn_pacientes = self.criar_botao_menu(
+            "👥 Pacientes", "pacientes"
+        )
+        self.btn_alertas = self.criar_botao_menu(
+            "⚠️ Alertas", "alertas"
+        )
+        self.btn_agenda = self.criar_botao_menu(
+            "📅 Agenda do Dia", "agenda"
+        )
 
         self.btn_sair = ctk.CTkButton(
             self.menu_lateral,
@@ -92,15 +111,138 @@ class TelaDashboardProfissional:
             fg_color="transparent",
             text_color=self.COR_TEXTO_MENU,
             hover_color=self.COR_MENU_HOVER,
-            command=self.master.abrir_login
+            command=self.master.abrir_login,
         )
-        self.btn_sair.pack(side="bottom", pady=25, padx=15, fill="x")
+        self.btn_sair.pack(
+            side="bottom",
+            pady=25,
+            padx=15,
+            fill="x",
+        )
 
         # 2. PAINEL DE CONTEÚDO
-        self.painel_conteudo = ctk.CTkFrame(self.container_geral, fg_color=self.COR_FUNDO, corner_radius=0)
-        self.painel_conteudo.pack(side="right", fill="both", expand=True)
+        self.painel_conteudo = ctk.CTkFrame(
+            self.container_geral,
+            fg_color=self.COR_FUNDO,
+            corner_radius=0,
+        )
+        self.painel_conteudo.pack(
+            side="right",
+            fill="both",
+            expand=True,
+        )
 
         self.mudar_aba("pacientes")
+
+    @staticmethod
+    def _normalizar_paciente(usuario):
+        """Converte o cadastro do banco para o formato usado pelo painel."""
+        return {
+            "id": usuario.get("id"),
+            "nome": usuario.get("nome", "Paciente sem nome"),
+
+            # Estes campos ainda não são solicitados no cadastro atual.
+            # Não inventamos semanas, consultas nem medições para pacientes reais.
+            "semanas": None,
+            "consulta": "Não agendada",
+            "bpm": None,
+            "pa_sis": None,
+            "pa_dia": None,
+            "spo2": None,
+            "temp": None,
+        }
+
+    def avaliar_paciente(self, paciente):
+        """Avalia os dados disponíveis e devolve motivos de alerta."""
+        campos_vitais = (
+            "pa_sis",
+            "pa_dia",
+            "bpm",
+            "spo2",
+            "temp",
+        )
+
+        # Sem um conjunto completo de medições, não declarar
+        # paciente normal ou em alerta.
+        if any(
+            paciente.get(campo) is None
+            for campo in campos_vitais
+        ):
+            return []
+
+        motivos = []
+
+        if (
+            paciente["pa_sis"] >= self.LIMITE_PA_SISTOLICA
+            or paciente["pa_dia"] >= self.LIMITE_PA_DIASTOLICA
+        ):
+            motivos.append(
+                f'Pressão arterial elevada: '
+                f'{paciente["pa_sis"]}/{paciente["pa_dia"]} mmHg'
+            )
+
+        if paciente["bpm"] > self.LIMITE_BPM:
+            motivos.append(
+                f'Frequência cardíaca alta: {paciente["bpm"]} bpm'
+            )
+
+        if paciente["spo2"] < self.LIMITE_SPO2:
+            motivos.append(
+                f'Oxigenação baixa: {paciente["spo2"]}%'
+            )
+
+        if paciente["temp"] >= self.LIMITE_FEBRE:
+            temperatura = str(
+                paciente["temp"]
+            ).replace(".", ",")
+
+            motivos.append(
+                f"Temperatura elevada: {temperatura} °C"
+            )
+
+        return motivos
+
+    def preparar_pacientes(self):
+        """Define status sem tratar ausência de medições como normalidade."""
+        campos_vitais = (
+            "pa_sis",
+            "pa_dia",
+            "bpm",
+            "spo2",
+            "temp",
+        )
+
+        for paciente in self.PACIENTES:
+            tem_medicoes = all(
+                paciente.get(campo) is not None
+                for campo in campos_vitais
+            )
+
+            if not tem_medicoes:
+                paciente["status"] = "Sem dados"
+                paciente["motivo"] = (
+                    "Ainda não há sinais vitais registrados."
+                )
+                continue
+
+            motivos = self.avaliar_paciente(paciente)
+            paciente["status"] = (
+                "Alerta" if motivos else "Normal"
+            )
+            paciente["motivo"] = "; ".join(motivos)
+
+    @staticmethod
+    def texto_semanas(paciente):
+        semanas = paciente.get("semanas")
+
+        if semanas is None:
+            return "Semanas não informadas"
+
+        return f"{semanas} semanas"
+
+    @staticmethod
+    def texto_consulta(paciente):
+        return paciente.get("consulta") or "Não agendada"
 
     # --- NAVEGAÇÃO ---
     def criar_botao_menu(self, texto, nome_aba):
@@ -113,9 +255,13 @@ class TelaDashboardProfissional:
             text_color=self.COR_TEXTO_MENU,
             hover_color=self.COR_MENU_HOVER,
             height=40,
-            command=lambda: self.mudar_aba(nome_aba)
+            command=lambda: self.mudar_aba(nome_aba),
         )
-        botao.pack(pady=6, padx=15, fill="x")
+        botao.pack(
+            pady=6,
+            padx=15,
+            fill="x",
+        )
         return botao
 
     def limpar_painel(self):
@@ -130,11 +276,18 @@ class TelaDashboardProfissional:
             "alertas": self.btn_alertas,
             "agenda": self.btn_agenda,
         }
+
         for nome, botao in botoes.items():
             if nome == nome_aba:
-                botao.configure(fg_color=self.COR_ATIVO, text_color="white")
+                botao.configure(
+                    fg_color=self.COR_ATIVO,
+                    text_color="white",
+                )
             else:
-                botao.configure(fg_color="transparent", text_color=self.COR_TEXTO_MENU)
+                botao.configure(
+                    fg_color="transparent",
+                    text_color=self.COR_TEXTO_MENU,
+                )
 
         if nome_aba == "pacientes":
             self.carregar_pacientes()
@@ -146,65 +299,180 @@ class TelaDashboardProfissional:
     # --- COMPONENTES REUTILIZÁVEIS ---
     def titulo_aba(self, titulo, subtitulo):
         ctk.CTkLabel(
-            self.painel_conteudo, text=titulo,
-            font=("Arial", 22, "bold"), text_color=self.COR_TITULO, anchor="w"
-        ).pack(fill="x", padx=25, pady=(25, 0))
+            self.painel_conteudo,
+            text=titulo,
+            font=("Arial", 22, "bold"),
+            text_color=self.COR_TITULO,
+            anchor="w",
+        ).pack(
+            fill="x",
+            padx=25,
+            pady=(25, 0),
+        )
+
         ctk.CTkLabel(
-            self.painel_conteudo, text=subtitulo,
-            font=("Arial", 12), text_color=self.COR_TEXTO, anchor="w"
-        ).pack(fill="x", padx=25, pady=(0, 15))
+            self.painel_conteudo,
+            text=subtitulo,
+            font=("Arial", 12),
+            text_color=self.COR_TEXTO,
+            anchor="w",
+        ).pack(
+            fill="x",
+            padx=25,
+            pady=(0, 15),
+        )
+
+    def mostrar_aviso_demo(self):
+        """Identifica visualmente os dados fictícios quando o painel está em demonstração."""
+        if not self.modo_demo:
+            return
+
+        ctk.CTkLabel(
+            self.painel_conteudo,
+            text=(
+                "MODO DEMONSTRAÇÃO: pacientes, consultas "
+                "e sinais vitais abaixo são fictícios."
+            ),
+            fg_color=self.COR_DEMO_FUNDO,
+            text_color=self.COR_DEMO,
+            corner_radius=8,
+            font=("Arial", 11, "bold"),
+            wraplength=850,
+            padx=12,
+            pady=9,
+        ).pack(
+            fill="x",
+            padx=25,
+            pady=(0, 12),
+        )
 
     def criar_card(self, pai):
-        return ctk.CTkFrame(pai, fg_color=self.COR_CARD, border_color=self.COR_BORDA, border_width=1, corner_radius=10)
+        return ctk.CTkFrame(
+            pai,
+            fg_color=self.COR_CARD,
+            border_color=self.COR_BORDA,
+            border_width=1,
+            corner_radius=10,
+        )
 
     def criar_selo_status(self, pai, status):
-        """Selo colorido: vermelho para Alerta, verde para Normal"""
+        """Selo visual para alerta, normalidade ou ausência de medições."""
         if status == "Alerta":
-            fundo, texto = self.COR_ALERTA_FUNDO, self.COR_ALERTA
+            fundo, texto = (
+                self.COR_ALERTA_FUNDO,
+                self.COR_ALERTA,
+            )
+        elif status == "Normal":
+            fundo, texto = (
+                self.COR_OK_FUNDO,
+                self.COR_OK,
+            )
         else:
-            fundo, texto = self.COR_OK_FUNDO, self.COR_OK
+            fundo, texto = (
+                self.COR_SEM_DADOS_FUNDO,
+                self.COR_SEM_DADOS,
+            )
+
         return ctk.CTkLabel(
-            pai, text=status, width=70, height=24, corner_radius=12,
-            fg_color=fundo, text_color=texto, font=("Arial", 11, "bold")
+            pai,
+            text=status,
+            width=90,
+            height=24,
+            corner_radius=12,
+            fg_color=fundo,
+            text_color=texto,
+            font=("Arial", 11, "bold"),
         )
 
     # --- ABA 1: PACIENTES ---
     def carregar_pacientes(self):
-        self.titulo_aba("Pacientes", "Acompanhamento das gestantes sob seu cuidado")
+        self.titulo_aba(
+            "Pacientes",
+            "Acompanhamento das gestantes sob seu cuidado",
+        )
+        self.mostrar_aviso_demo()
 
-        # Resumo em 3 contadores
         total = len(self.PACIENTES)
-        em_alerta = len([p for p in self.PACIENTES if p["status"] == "Alerta"])
-        hoje = len([p for p in self.PACIENTES if p["consulta"].startswith("Hoje")])
 
-        linha_resumo = ctk.CTkFrame(self.painel_conteudo, fg_color="transparent")
-        linha_resumo.pack(fill="x", padx=20, pady=(0, 10))
+        em_alerta = sum(
+            1 for paciente in self.PACIENTES
+            if paciente["status"] == "Alerta"
+        )
+
+        consultas_hoje = sum(
+            1 for paciente in self.PACIENTES
+            if self.texto_consulta(paciente).startswith("Hoje")
+        )
+
+        linha_resumo = ctk.CTkFrame(
+            self.painel_conteudo,
+            fg_color="transparent",
+        )
+        linha_resumo.pack(
+            fill="x",
+            padx=20,
+            pady=(0, 10),
+        )
+
         for coluna in range(3):
             linha_resumo.columnconfigure(coluna, weight=1)
 
         resumos = [
             ("Total de pacientes", total, self.COR_TITULO),
             ("Em alerta", em_alerta, self.COR_ALERTA),
-            ("Consultas hoje", hoje, self.COR_ATIVO),
+            ("Consultas hoje", consultas_hoje, self.COR_ATIVO),
         ]
+
         for coluna, (rotulo, valor, cor) in enumerate(resumos):
             card = self.criar_card(linha_resumo)
-            card.grid(row=0, column=coluna, padx=5, sticky="nsew")
-            ctk.CTkLabel(card, text=str(valor), font=("Arial", 26, "bold"), text_color=cor).pack(pady=(10, 0))
-            ctk.CTkLabel(card, text=rotulo, font=("Arial", 11), text_color=self.COR_TEXTO).pack(pady=(0, 10))
+            card.grid(
+                row=0,
+                column=coluna,
+                padx=5,
+                sticky="nsew",
+            )
 
-        # Busca por nome
+            ctk.CTkLabel(
+                card,
+                text=str(valor),
+                font=("Arial", 26, "bold"),
+                text_color=cor,
+            ).pack(pady=(10, 0))
+
+            ctk.CTkLabel(
+                card,
+                text=rotulo,
+                font=("Arial", 11),
+                text_color=self.COR_TEXTO,
+            ).pack(pady=(0, 10))
+
         self.entrada_busca = ctk.CTkEntry(
             self.painel_conteudo,
             placeholder_text="🔍 Buscar paciente pelo nome...",
-            fg_color="white", border_color=self.COR_BORDA, height=36
+            fg_color="white",
+            border_color=self.COR_BORDA,
+            height=36,
         )
-        self.entrada_busca.pack(fill="x", padx=25, pady=(5, 10))
-        self.entrada_busca.bind("<KeyRelease>", lambda event: self.desenhar_lista_pacientes())
+        self.entrada_busca.pack(
+            fill="x",
+            padx=25,
+            pady=(5, 10),
+        )
+        self.entrada_busca.bind(
+            "<KeyRelease>",
+            lambda event: self.desenhar_lista_pacientes(),
+        )
 
-        # Lista com rolagem
-        self.lista_pacientes = ctk.CTkScrollableFrame(self.painel_conteudo, fg_color="transparent")
-        self.lista_pacientes.pack(fill="both", expand=True, padx=20, pady=(0, 15))
+        self.lista_pacientes = ctk.CTkScrollableFrame(
+            self.painel_conteudo,
+            fg_color="transparent",
+        )
+        self.lista_pacientes.pack(
+            fill="both",
+            expand=True,
+            padx=20,
+            pady=(0, 15),
+        )
 
         self.desenhar_lista_pacientes()
 
@@ -212,11 +480,19 @@ class TelaDashboardProfissional:
         for componente in self.lista_pacientes.winfo_children():
             componente.destroy()
 
-        filtro = self.entrada_busca.get().strip().lower()
-        encontrados = [p for p in self.PACIENTES if filtro in p["nome"].lower()]
+        filtro = self.entrada_busca.get().strip().casefold()
+
+        encontrados = [
+            paciente for paciente in self.PACIENTES
+            if filtro in paciente["nome"].casefold()
+        ]
 
         if not encontrados:
-            ctk.CTkLabel(self.lista_pacientes, text="Nenhuma paciente encontrada.", text_color=self.COR_TEXTO).pack(pady=20)
+            ctk.CTkLabel(
+                self.lista_pacientes,
+                text="Nenhuma paciente encontrada.",
+                text_color=self.COR_TEXTO,
+            ).pack(pady=20)
             return
 
         for paciente in encontrados:
@@ -224,51 +500,239 @@ class TelaDashboardProfissional:
             linha.pack(fill="x", pady=4)
             linha.columnconfigure(0, weight=1)
 
-            ctk.CTkLabel(linha, text=paciente["nome"], font=("Arial", 13, "bold"), text_color=self.COR_TITULO, anchor="w").grid(row=0, column=0, sticky="w", padx=15, pady=(10, 0))
-            ctk.CTkLabel(linha, text=f'{paciente["semanas"]} semanas • Consulta: {paciente["consulta"]}', font=("Arial", 11), text_color=self.COR_TEXTO, anchor="w").grid(row=1, column=0, sticky="w", padx=15, pady=(0, 10))
-            self.criar_selo_status(linha, paciente["status"]).grid(row=0, column=1, rowspan=2, padx=15)
+            ctk.CTkLabel(
+                linha,
+                text=paciente["nome"],
+                font=("Arial", 13, "bold"),
+                text_color=self.COR_TITULO,
+                anchor="w",
+            ).grid(
+                row=0,
+                column=0,
+                sticky="w",
+                padx=15,
+                pady=(10, 0),
+            )
+
+            resumo = (
+                f"{self.texto_semanas(paciente)} • "
+                f"Consulta: {self.texto_consulta(paciente)}"
+            )
+
+            ctk.CTkLabel(
+                linha,
+                text=resumo,
+                font=("Arial", 11),
+                text_color=self.COR_TEXTO,
+                anchor="w",
+            ).grid(
+                row=1,
+                column=0,
+                sticky="w",
+                padx=15,
+                pady=(0, 10),
+            )
+
+            self.criar_selo_status(
+                linha,
+                paciente["status"],
+            ).grid(
+                row=0,
+                column=1,
+                rowspan=2,
+                padx=15,
+            )
 
     # --- ABA 2: ALERTAS ---
     def carregar_alertas(self):
-        self.titulo_aba("Alertas", "Pacientes com sinais vitais fora do normal")
+        self.titulo_aba(
+            "Alertas",
+            "Pacientes com sinais vitais registrados fora dos limites configurados",
+        )
+        self.mostrar_aviso_demo()
 
-        alertas = [p for p in self.PACIENTES if p["status"] == "Alerta"]
+        alertas = [
+            paciente for paciente in self.PACIENTES
+            if paciente["status"] == "Alerta"
+        ]
 
-        lista = ctk.CTkScrollableFrame(self.painel_conteudo, fg_color="transparent")
-        lista.pack(fill="both", expand=True, padx=20, pady=(0, 15))
+        lista = ctk.CTkScrollableFrame(
+            self.painel_conteudo,
+            fg_color="transparent",
+        )
+        lista.pack(
+            fill="both",
+            expand=True,
+            padx=20,
+            pady=(0, 15),
+        )
 
         if not alertas:
-            ctk.CTkLabel(lista, text="Nenhum alerta no momento. ✅", text_color=self.COR_OK, font=("Arial", 14)).pack(pady=30)
+            if self.modo_demo:
+                mensagem = (
+                    "Nenhum alerta na demonstração neste momento."
+                )
+            elif not any(
+                paciente["status"] != "Sem dados"
+                for paciente in self.PACIENTES
+            ):
+                mensagem = (
+                    "Ainda não há sinais vitais registrados para avaliar."
+                )
+            else:
+                mensagem = (
+                    "Nenhum alerta gerado pelos dados registrados."
+                )
+
+            ctk.CTkLabel(
+                lista,
+                text=mensagem,
+                text_color=self.COR_TEXTO,
+                font=("Arial", 14),
+                wraplength=800,
+            ).pack(pady=30)
             return
 
         for paciente in alertas:
-            card = ctk.CTkFrame(lista, fg_color=self.COR_ALERTA_FUNDO, border_color=self.COR_ALERTA, border_width=1, corner_radius=10)
+            card = ctk.CTkFrame(
+                lista,
+                fg_color=self.COR_ALERTA_FUNDO,
+                border_color=self.COR_ALERTA,
+                border_width=1,
+                corner_radius=10,
+            )
             card.pack(fill="x", pady=5)
-            ctk.CTkLabel(card, text=f'⚠️ {paciente["nome"]} ({paciente["semanas"]} semanas)', font=("Arial", 14, "bold"), text_color=self.COR_ALERTA, anchor="w").pack(fill="x", padx=15, pady=(12, 2))
-            ctk.CTkLabel(card, text=paciente["motivo"], font=("Arial", 12), text_color=self.COR_TEXTO, anchor="w").pack(fill="x", padx=15)
-            ctk.CTkLabel(card, text=f'Próxima consulta: {paciente["consulta"]}', font=("Arial", 11), text_color=self.COR_TEXTO, anchor="w").pack(fill="x", padx=15, pady=(2, 12))
+
+            ctk.CTkLabel(
+                card,
+                text=(
+                    f'⚠️ {paciente["nome"]} '
+                    f'({self.texto_semanas(paciente)})'
+                ),
+                font=("Arial", 14, "bold"),
+                text_color=self.COR_ALERTA,
+                anchor="w",
+            ).pack(
+                fill="x",
+                padx=15,
+                pady=(12, 2),
+            )
+
+            ctk.CTkLabel(
+                card,
+                text=paciente["motivo"],
+                font=("Arial", 12),
+                text_color=self.COR_TEXTO,
+                anchor="w",
+                wraplength=850,
+            ).pack(fill="x", padx=15)
+
+            ctk.CTkLabel(
+                card,
+                text=(
+                    f'Próxima consulta: '
+                    f'{self.texto_consulta(paciente)}'
+                ),
+                font=("Arial", 11),
+                text_color=self.COR_TEXTO,
+                anchor="w",
+            ).pack(
+                fill="x",
+                padx=15,
+                pady=(2, 12),
+            )
 
     # --- ABA 3: AGENDA DO DIA ---
     def carregar_agenda(self):
-        self.titulo_aba("Agenda do Dia", "Consultas marcadas para hoje")
+        self.titulo_aba(
+            "Agenda do Dia",
+            "Consultas marcadas para hoje",
+        )
+        self.mostrar_aviso_demo()
 
-        consultas = [p for p in self.PACIENTES if p["consulta"].startswith("Hoje")]
-        consultas.sort(key=lambda p: p["consulta"])
+        consultas = [
+            paciente for paciente in self.PACIENTES
+            if self.texto_consulta(paciente).startswith("Hoje")
+        ]
 
-        lista = ctk.CTkScrollableFrame(self.painel_conteudo, fg_color="transparent")
-        lista.pack(fill="both", expand=True, padx=20, pady=(0, 15))
+        consultas.sort(
+            key=lambda paciente: self.texto_consulta(paciente)
+        )
+
+        lista = ctk.CTkScrollableFrame(
+            self.painel_conteudo,
+            fg_color="transparent",
+        )
+        lista.pack(
+            fill="both",
+            expand=True,
+            padx=20,
+            pady=(0, 15),
+        )
 
         if not consultas:
-            ctk.CTkLabel(lista, text="Nenhuma consulta para hoje.", text_color=self.COR_TEXTO).pack(pady=30)
+            ctk.CTkLabel(
+                lista,
+                text="Nenhuma consulta registrada para hoje.",
+                text_color=self.COR_TEXTO,
+            ).pack(pady=30)
             return
 
         for paciente in consultas:
-            hora = paciente["consulta"].replace("Hoje ", "")
+            hora = self.texto_consulta(paciente).replace(
+                "Hoje ", "", 1
+            )
+
             card = self.criar_card(lista)
             card.pack(fill="x", pady=5)
             card.columnconfigure(1, weight=1)
 
-            ctk.CTkLabel(card, text=hora, font=("Arial", 20, "bold"), text_color=self.COR_ATIVO, width=80).grid(row=0, column=0, rowspan=2, padx=(15, 10), pady=12)
-            ctk.CTkLabel(card, text=paciente["nome"], font=("Arial", 14, "bold"), text_color=self.COR_TITULO, anchor="w").grid(row=0, column=1, sticky="w", pady=(12, 0))
-            ctk.CTkLabel(card, text=f'{paciente["semanas"]} semanas • Pré-natal', font=("Arial", 11), text_color=self.COR_TEXTO, anchor="w").grid(row=1, column=1, sticky="w", pady=(0, 12))
-            self.criar_selo_status(card, paciente["status"]).grid(row=0, column=2, rowspan=2, padx=15)
+            ctk.CTkLabel(
+                card,
+                text=hora,
+                font=("Arial", 20, "bold"),
+                text_color=self.COR_ATIVO,
+                width=80,
+            ).grid(
+                row=0,
+                column=0,
+                rowspan=2,
+                padx=(15, 10),
+                pady=12,
+            )
+
+            ctk.CTkLabel(
+                card,
+                text=paciente["nome"],
+                font=("Arial", 14, "bold"),
+                text_color=self.COR_TITULO,
+                anchor="w",
+            ).grid(
+                row=0,
+                column=1,
+                sticky="w",
+                pady=(12, 0),
+            )
+
+            ctk.CTkLabel(
+                card,
+                text=f'{self.texto_semanas(paciente)} • Pré-natal',
+                font=("Arial", 11),
+                text_color=self.COR_TEXTO,
+                anchor="w",
+            ).grid(
+                row=1,
+                column=1,
+                sticky="w",
+                pady=(0, 12),
+            )
+
+            self.criar_selo_status(
+                card,
+                paciente["status"],
+            ).grid(
+                row=0,
+                column=2,
+                rowspan=2,
+                padx=15,
+            )

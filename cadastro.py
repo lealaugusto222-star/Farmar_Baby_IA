@@ -1,5 +1,5 @@
 import customtkinter as ctk
-from tkinter import messagebox
+from tkinter import messagebox #serve para exibir mensagens de erro ou sucesso
 from datetime import datetime
 
 import banco
