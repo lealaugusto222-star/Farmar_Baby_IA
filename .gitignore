@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Ambientes virtuais
+.venv/
+venv/
+env/
+
+# Segredos e configuracao local
+.env
+.env.*
+!.env.example
+
+# Saidas de ferramentas
+.pytest_cache/
+.coverage
+htmlcov/
