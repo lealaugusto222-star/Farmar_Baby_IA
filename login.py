@@ -2,8 +2,14 @@ import customtkinter as ctk
 from tkinter import messagebox
 from PIL import Image, ImageChops
 import os
+import re
 
 import banco
+
+
+def email_valido(email):
+    """Verifica o formato básico de um endereço de e-mail."""
+    return re.fullmatch(r"[^@\s]+@(?:[^.@\s]+\.)+[^.@\s]+", email) is not None
 
 
 def preparar_logo(caminho, altura_desejada):
@@ -93,8 +99,8 @@ class TelaLogin:
         self.senha.pack(pady=8)
 
         # Apertar Enter em qualquer campo também faz o login
-        self.usuario.bind("<Return>", lambda event: self.validar_login())
-        self.senha.bind("<Return>", lambda event: self.validar_login())
+        self.usuario.bind("<Return>", self._ao_pressionar_enter)
+        self.senha.bind("<Return>", self._ao_pressionar_enter)
 
         # --- BOTÃO ENTRAR ---
         self.botao_entrar = ctk.CTkButton(
@@ -122,20 +128,41 @@ class TelaLogin:
         )
         self.link_cadastro.pack(pady=5)
 
+    def _ao_pressionar_enter(self, event):
+        self.validar_login()
+        return "break"
+
     def validar_login(self):
         email = self.usuario.get().strip()
         senha_digitada = self.senha.get()
         tipo_perfil = self.perfil_selecionado.get().lower()  # "gestante" ou "profissional"
 
         if not email or not senha_digitada:
-            messagebox.showerror("Erro de Acesso", "Preencha o e-mail e a senha.")
+            messagebox.showerror(
+                "Dados incompletos",
+                "Informe seu e-mail e sua senha para entrar.",
+            )
+            return
+
+        if not email_valido(email):
+            messagebox.showerror(
+                "E-mail inválido",
+                "Digite um endereço de e-mail válido.",
+            )
             return
 
         # Confere no banco de dados (e-mail, senha e perfil escolhido)
-        usuario = banco.validar_login(email, senha_digitada, tipo_perfil)
+        try:
+            usuario = banco.validar_login(email, senha_digitada, tipo_perfil)
+        except banco.ErroBanco as erro:
+            messagebox.showerror("Falha no acesso", str(erro))
+            return
 
         if usuario is None:
-            messagebox.showerror("Erro de Acesso", "E-mail, senha ou perfil incorretos!")
+            messagebox.showerror(
+                "Não foi possível entrar",
+                "Confira seu e-mail, sua senha e o perfil selecionado.",
+            )
             return
 
         if usuario["tipo"] == "gestante":

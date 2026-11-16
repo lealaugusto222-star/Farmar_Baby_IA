@@ -1,8 +1,9 @@
 import hashlib
 import hmac
+import logging
 import os
 import sqlite3
-from contextlib import closing
+from contextlib import contextmanager
 
 # O banco fica na mesma pasta do projeto.
 CAMINHO_BANCO = os.path.join(
@@ -10,10 +11,31 @@ CAMINHO_BANCO = os.path.join(
     "farmar_baby.db",
 )
 
+logger = logging.getLogger(__name__)
 
+
+class ErroBanco(Exception):
+    """Indica uma falha de acesso ou operação no banco de dados."""
+
+
+@contextmanager
 def _conectar():
-    """Abre uma conexão com o banco de dados do projeto."""
-    return sqlite3.connect(CAMINHO_BANCO)
+    """Fornece uma conexão transacional e garante rollback e fechamento."""
+    conexao = None
+    try:
+        conexao = sqlite3.connect(CAMINHO_BANCO)
+        yield conexao
+        conexao.commit()
+    except sqlite3.Error as erro:
+        if conexao is not None:
+            conexao.rollback()
+        logger.exception("Falha ao acessar o banco de dados.")
+        raise ErroBanco(
+            "Não foi possível acessar os dados. Tente novamente."
+        ) from erro
+    finally:
+        if conexao is not None:
+            conexao.close()
 
 
 def _gerar_hash(senha, salt=None):
@@ -42,7 +64,7 @@ def _conferir_hash(senha, hash_guardado):
 
 def criar_tabelas():
     """Cria a tabela e remove a conta profissional com a senha de demonstração."""
-    with closing(_conectar()) as conexao:
+    with _conectar() as conexao:
         conexao.execute(
             """
             CREATE TABLE IF NOT EXISTS usuarios (
@@ -72,46 +94,45 @@ def criar_tabelas():
                 ("profissional@farmarbaby.com", "profissional"),
             )
 
-        conexao.commit()
-
 
 def cadastrar_usuario(nome, email, telefone, data_nasc, senha, tipo="gestante"):
     """Cadastra usuário. Retorna (True, mensagem) ou (False, motivo)."""
-    criar_tabelas()
-
     if tipo not in ("gestante", "profissional"):
         return False, "Tipo de usuário inválido."
 
     try:
-        with closing(_conectar()) as conexao:
-            conexao.execute(
-                """
-                INSERT INTO usuarios
-                    (nome, email, telefone, data_nasc, senha_hash, tipo)
-                VALUES (?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    nome.strip(),
-                    email.strip().lower(),
-                    telefone.strip(),
-                    data_nasc.strip(),
-                    _gerar_hash(senha),
-                    tipo,
-                ),
-            )
-            conexao.commit()
+        criar_tabelas()
+        with _conectar() as conexao:
+            try:
+                conexao.execute(
+                    """
+                    INSERT INTO usuarios
+                        (nome, email, telefone, data_nasc, senha_hash, tipo)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        nome.strip(),
+                        email.strip().lower(),
+                        telefone.strip(),
+                        data_nasc.strip(),
+                        _gerar_hash(senha),
+                        tipo,
+                    ),
+                )
+            except sqlite3.IntegrityError:
+                return False, "Este e-mail já está cadastrado."
 
         return True, "Cadastro realizado com sucesso!"
 
-    except sqlite3.IntegrityError:
-        return False, "Este e-mail já está cadastrado."
+    except ErroBanco as erro:
+        return False, str(erro)
 
 
 def validar_login(email, senha, tipo="gestante"):
     """Valida e-mail, senha e perfil. Retorna os dados do usuário ou None."""
     criar_tabelas()
 
-    with closing(_conectar()) as conexao:
+    with _conectar() as conexao:
         linha = conexao.execute(
             """
             SELECT nome, email, tipo, senha_hash
@@ -149,7 +170,7 @@ def listar_usuarios(tipo="gestante"):
 
     criar_tabelas()
 
-    with closing(_conectar()) as conexao:
+    with _conectar() as conexao:
         linhas = conexao.execute(
             """
             SELECT id, nome, email, tipo

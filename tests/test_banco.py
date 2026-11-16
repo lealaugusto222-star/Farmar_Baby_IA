@@ -134,7 +134,7 @@ def test_credencial_de_teste_nao_abre_painel(monkeypatch):
             self.paineis_abertos.append(("profissional", None))
 
     tela = login.TelaLogin.__new__(login.TelaLogin)
-    tela.usuario = Campo("admin")
+    tela.usuario = Campo("admin@example.com")
     tela.senha = Campo("1234")
     tela.perfil_selecionado = Campo("Profissional")
     tela.master = Master()

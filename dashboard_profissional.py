@@ -1,4 +1,6 @@
 import customtkinter as ctk
+from tkinter import messagebox
+
 import banco
 
 
@@ -46,10 +48,16 @@ class TelaDashboardProfissional:
 
         # Usa os cadastros reais sempre que houver gestantes no banco.
         # Se ainda não houver nenhuma, mantém a demonstração que já existia.
-        usuarios_cadastrados = banco.listar_usuarios("gestante")
-        self.modo_demo = not bool(usuarios_cadastrados)
+        try:
+            usuarios_cadastrados = banco.listar_usuarios("gestante")
+        except banco.ErroBanco as erro:
+            messagebox.showerror("Falha ao carregar pacientes", str(erro))
+            usuarios_cadastrados = None
+        self.modo_demo = usuarios_cadastrados is not None and not usuarios_cadastrados
 
-        if self.modo_demo:
+        if usuarios_cadastrados is None:
+            self.PACIENTES = []
+        elif self.modo_demo:
             self.PACIENTES = [
                 paciente.copy()
                 for paciente in self.PACIENTES_DEMO

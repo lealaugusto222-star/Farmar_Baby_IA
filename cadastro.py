@@ -1,4 +1,5 @@
 import customtkinter as ctk
+import re
 from tkinter import messagebox #serve para exibir mensagens de erro ou sucesso
 from datetime import datetime
 
@@ -54,11 +55,21 @@ class TelaCadastro:
         self.data_nasc.bind("<KeyRelease>", self.formatar_data)
 
         # Linha 3: Senha e Confirmar Senha
-        self.senha = ctk.CTkEntry(container_campos, width=220, height=42, placeholder_text="Senha (mín. 6 caracteres)", show="*", fg_color="#f8fafc", border_color="#e2e8f0", border_width=1)
+        self.senha = ctk.CTkEntry(container_campos, width=220, height=42, placeholder_text="Senha (mín. 8 caracteres)", show="*", fg_color="#f8fafc", border_color="#e2e8f0", border_width=1)
         self.senha.grid(row=2, column=0, padx=12, pady=10)
 
         self.conf_senha = ctk.CTkEntry(container_campos, width=220, height=42, placeholder_text="Confirmar Senha", show="*", fg_color="#f8fafc", border_color="#e2e8f0", border_width=1)
         self.conf_senha.grid(row=2, column=1, padx=12, pady=10)
+
+        for campo in (
+            self.nome,
+            self.email,
+            self.telefone,
+            self.data_nasc,
+            self.senha,
+            self.conf_senha,
+        ):
+            campo.bind("<Return>", self._ao_pressionar_enter)
 
         # --- TERMOS DE USO (Checkbox) ---
         self.termos = ctk.CTkCheckBox(
@@ -121,6 +132,10 @@ class TelaCadastro:
         self.data_nasc.delete(0, "end")
         self.data_nasc.insert(0, texto_formatado)
 
+    def _ao_pressionar_enter(self, event):
+        self.executar_cadastro()
+        return "break"
+
     def validar_campos(self, nome, email, telefone, data_nasc, senha, conf_senha):
         """Retorna uma mensagem de erro, ou None se estiver tudo certo"""
         if not all([nome, email, telefone, data_nasc, senha, conf_senha]):
@@ -129,7 +144,7 @@ class TelaCadastro:
         if len(nome.split()) < 2:
             return "Digite o nome completo (nome e sobrenome)."
 
-        if "@" not in email or "." not in email.split("@")[-1]:
+        if re.fullmatch(r"[^@\s]+@(?:[^.@\s]+\.)+[^.@\s]+", email) is None:
             return "Digite um e-mail válido."
 
         digitos_telefone = "".join(c for c in telefone if c.isdigit())
@@ -143,8 +158,8 @@ class TelaCadastro:
         if nascimento > datetime.now():
             return "A data de nascimento não pode estar no futuro."
 
-        if len(senha) < 6:
-            return "A senha precisa ter pelo menos 6 caracteres."
+        if len(senha) < 8:
+            return "A senha precisa ter pelo menos 8 caracteres."
 
         if senha != conf_senha:
             return "As senhas não coincidem."
@@ -167,7 +182,14 @@ class TelaCadastro:
             messagebox.showerror("Erro no cadastro", erro)
             return
 
-        sucesso, mensagem = banco.cadastrar_usuario(nome, email, telefone, data_nasc, senha)
+        try:
+            sucesso, mensagem = banco.cadastrar_usuario(
+                nome, email, telefone, data_nasc, senha
+            )
+        except banco.ErroBanco as erro:
+            messagebox.showerror("Falha no cadastro", str(erro))
+            return
+
         if sucesso:
             messagebox.showinfo("Cadastro", mensagem + "\nAgora faça o login.")
             self.master.abrir_login()
