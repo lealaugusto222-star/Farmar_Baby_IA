@@ -5,6 +5,7 @@ import os
 import re
 
 import banco
+from ui_components import IconEntry, PasswordField
 
 
 def email_valido(email):
@@ -30,62 +31,129 @@ class TelaLogin:
     def __init__(self, master):
         self.master = master
 
-        # Fundo suave para destacar o cartão de acesso.
         self.painel_principal = ctk.CTkFrame(
             self.master,
-            fg_color="#f8fafc",
-            corner_radius=0
+            fg_color="#f7f8fb",
+            corner_radius=0,
         )
         self.painel_principal.pack(fill="both", expand=True)
-
-        # Cartão central com largura consistente e conteúdo alinhado.
-        self.conteudo_centro = ctk.CTkFrame(
-            self.painel_principal,
-            fg_color="white",
-            corner_radius=20,
-            border_width=1,
-            border_color="#f1dce3",
-            width=420,
+        self.painel_principal.grid_rowconfigure(0, weight=1)
+        self.painel_principal.grid_columnconfigure(
+            0,
+            weight=4,
+            minsize=280,
         )
-        self.conteudo_centro.pack(expand=True, padx=24, pady=24)
+        self.painel_principal.grid_columnconfigure(
+            1,
+            weight=6,
+            minsize=430,
+        )
 
-        # --- CARREGAR A LOGO ---
+        self.painel_institucional = ctk.CTkFrame(
+            self.painel_principal,
+            fg_color="#f8eaf0",
+            corner_radius=0,
+        )
+        self.painel_institucional.grid(row=0, column=0, sticky="nsew")
+        self.painel_institucional.grid_columnconfigure(0, weight=1)
+        self.painel_institucional.grid_rowconfigure(0, weight=1)
+        self.painel_institucional.grid_rowconfigure(2, weight=1)
+
+        institucional = ctk.CTkFrame(
+            self.painel_institucional,
+            fg_color="transparent",
+        )
+        institucional.grid(
+            row=1,
+            column=0,
+            sticky="ew",
+            padx=24,
+            pady=24,
+        )
+        institucional.grid_columnconfigure(0, weight=1)
+        ctk.CTkLabel(
+            institucional,
+            text="CUIDADO QUE ACOLHE",
+            font=("Arial", 10, "bold"),
+            text_color="#9e536c",
+        ).pack(pady=(0, 14))
+
         caminho_atual = os.path.dirname(__file__)
         caminho_foto = os.path.join(caminho_atual, "foto_login.png")
-
         try:
             altura_logo = min(
-                max(int(self.master.winfo_screenheight() * 0.18), 125),
-                210,
+                max(int(self.master.winfo_screenheight() * 0.16), 135),
+                185,
             )
             imagem, largura, altura = preparar_logo(caminho_foto, altura_logo)
-            self.imagem_logo = ctk.CTkImage(light_image=imagem, dark_image=imagem, size=(largura, altura))
-            self.logo_label = ctk.CTkLabel(self.conteudo_centro, image=self.imagem_logo, text="")
-            self.logo_label.pack(pady=(28, 8))
+            self.imagem_logo = ctk.CTkImage(
+                light_image=imagem,
+                dark_image=imagem,
+                size=(largura, altura),
+            )
+            ctk.CTkLabel(
+                institucional,
+                image=self.imagem_logo,
+                text="",
+            ).pack(pady=(0, 12))
         except FileNotFoundError:
             ctk.CTkLabel(
-                self.conteudo_centro,
+                institucional,
                 text="FARMAR BABY",
                 font=("Arial", 22, "bold"),
-                text_color="#ba4b6e",
-            ).pack(pady=(32, 12))
-
+                text_color="#b84f73",
+            ).pack(pady=(12, 24))
         ctk.CTkLabel(
-            self.conteudo_centro,
-            text="Acesse sua conta",
-            font=("Arial", 22, "bold"),
-            text_color="#344054",
-        ).pack(pady=(4, 4))
+            institucional,
+            text="Cuidando de quem\ngera o futuro.",
+            font=("Arial", 21, "bold"),
+            text_color="#284b67",
+            justify="center",
+        ).pack(pady=(4, 8))
         ctk.CTkLabel(
-            self.conteudo_centro,
-            text="Entre para continuar seu acompanhamento",
+            institucional,
+            text=(
+                "Um espaço de acolhimento e informação\n"
+                "para acompanhar cada etapa da gestação."
+            ),
             font=("Arial", 12),
+            text_color="#66758a",
+            justify="center",
+        ).pack()
+
+        self.painel_formulario = ctk.CTkFrame(
+            self.painel_principal,
+            fg_color="#ffffff",
+            corner_radius=0,
+        )
+        self.painel_formulario.grid(row=0, column=1, sticky="nsew")
+        self.painel_formulario.grid_rowconfigure(0, weight=1)
+        self.painel_formulario.grid_columnconfigure(0, weight=1)
+
+        self.conteudo_centro = ctk.CTkFrame(
+            self.painel_formulario,
+            fg_color="transparent",
+            width=380,
+        )
+        self.conteudo_centro.grid(row=0, column=0, padx=30, pady=24)
+        self.conteudo_centro.grid_columnconfigure(0, weight=1)
+
+        ctk.CTkLabel(
+            self.conteudo_centro,
+            text="Bem-vinda de volta",
+            font=("Arial", 26, "bold"),
+            text_color="#243447",
+            anchor="w",
+        ).grid(row=0, column=0, sticky="ew", pady=(0, 4))
+        ctk.CTkLabel(
+            self.conteudo_centro,
+            text="Entre com seus dados para continuar.",
+            font=("Arial", 13),
             text_color="#667085",
-        ).pack(pady=(0, 16))
+            anchor="w",
+        ).grid(row=1, column=0, sticky="ew", pady=(0, 22))
 
-        # --- SELETOR DE PERFIL (Gestante vs Profissional) ---
         self.perfil_selecionado = ctk.StringVar(value="Gestante")
-
         self.seletor_perfil = ctk.CTkSegmentedButton(
             self.conteudo_centro,
             values=["Gestante", "Profissional"],
@@ -93,98 +161,90 @@ class TelaLogin:
             selected_color="#ff6b8b",
             selected_hover_color="#e05372",
             font=("Arial", 13, "bold"),
-            width=320,
-            height=35
+            width=360,
+            height=40,
         )
-        self.seletor_perfil.pack(pady=(4, 14))
+        self.seletor_perfil.grid(
+            row=2,
+            column=0,
+            sticky="ew",
+            pady=(0, 22),
+        )
 
-        # --- CAMPOS DE ENTRADA ---
-        self.usuario = ctk.CTkEntry(
+        ctk.CTkLabel(
             self.conteudo_centro,
-            width=320,
-            height=42,
-            placeholder_text="E-mail",
-            fg_color="#f8fafc",
-            border_color="#e2e8f0",
-            border_width=1,
-            corner_radius=10,
-        )
-        self.usuario.pack(pady=7)
-
-        self.senha_mostrada = False
-        self.linha_senha = ctk.CTkFrame(
+            text="E-mail",
+            font=("Arial", 12, "bold"),
+            text_color="#344054",
+            anchor="w",
+        ).grid(row=3, column=0, sticky="ew", pady=(0, 7))
+        self.usuario = IconEntry(
             self.conteudo_centro,
-            fg_color="transparent",
-            width=320,
+            icon="envelope",
+            placeholder_text="voce@exemplo.com",
+            width=360,
+            height=50,
         )
-        self.linha_senha.pack(pady=7)
-        self.linha_senha.pack_propagate(False)
-        self.linha_senha.configure(height=42)
-        self.senha = ctk.CTkEntry(
-            self.linha_senha,
-            width=250,
-            height=42,
-            placeholder_text="Senha",
-            show="*",
-            fg_color="#f8fafc",
-            border_color="#e2e8f0",
-            border_width=1,
-            corner_radius=10,
-        )
-        self.senha.pack(side="left", fill="x", expand=True)
-        self.botao_mostrar_senha = ctk.CTkButton(
-            self.linha_senha,
-            width=64,
-            height=42,
-            text="Mostrar",
-            font=("Arial", 11, "bold"),
-            fg_color="#fce7ef",
-            hover_color="#f7c9d8",
-            text_color="#9f3f5e",
-            corner_radius=10,
-            command=self.alternar_visibilidade_senha,
-        )
-        self.botao_mostrar_senha.pack(side="right", padx=(6, 0))
+        self.usuario.grid(row=4, column=0, sticky="ew", pady=(0, 16))
 
-        # Apertar Enter em qualquer campo também faz o login
+        ctk.CTkLabel(
+            self.conteudo_centro,
+            text="Senha",
+            font=("Arial", 12, "bold"),
+            text_color="#344054",
+            anchor="w",
+        ).grid(row=5, column=0, sticky="ew", pady=(0, 7))
+        self.senha = PasswordField(
+            self.conteudo_centro,
+            width=360,
+            height=50,
+        )
+        self.senha.grid(row=6, column=0, sticky="ew")
+
         self.usuario.bind("<Return>", self._ao_pressionar_enter)
         self.senha.bind("<Return>", self._ao_pressionar_enter)
 
-        # --- BOTÃO ENTRAR ---
         self.botao_entrar = ctk.CTkButton(
             self.conteudo_centro,
-            width=320,
-            height=45,
+            height=48,
             text="Entrar",
-            font=("Arial", 16, "bold"),
-            fg_color="#ff6b8b",
-            hover_color="#d94f70",
-            corner_radius=10,
-            command=self.validar_login
+            font=("Arial", 15, "bold"),
+            fg_color="#c65378",
+            hover_color="#a94365",
+            corner_radius=12,
+            command=self.validar_login,
         )
-        self.botao_entrar.pack(pady=(17, 12))
+        self.botao_entrar.grid(
+            row=7,
+            column=0,
+            sticky="ew",
+            pady=(24, 12),
+        )
 
-        # --- LINK PARA O CADASTRO ---
         self.link_cadastro = ctk.CTkButton(
             self.conteudo_centro,
-            text="Ainda não tem uma conta? Cadastre-se",
-            font=("Arial", 12, "underline"),
+            text="Ainda não tem uma conta?  Criar cadastro",
+            font=("Arial", 12, "bold"),
             fg_color="transparent",
-            text_color="#ba4b6e",
-            hover_color="#fce7ef",
-            command=self.master.abrir_cadastro
+            text_color="#a94365",
+            hover_color="#fbeef3",
+            command=self.master.abrir_cadastro,
         )
-        self.link_cadastro.pack(pady=(4, 20))
+        self.link_cadastro.grid(row=8, column=0, pady=(0, 10))
+
+        ctk.CTkLabel(
+            self.conteudo_centro,
+            text="Farmar Baby  •  Cuidado e informação",
+            font=("Arial", 10),
+            text_color="#98a2b3",
+        ).grid(row=9, column=0, pady=(4, 0))
+
         self.master.after(100, self.usuario.focus_set)
 
     def alternar_visibilidade_senha(self):
-        self.senha_mostrada = not self.senha_mostrada
-        self.senha.configure(show="" if self.senha_mostrada else "*")
-        self.botao_mostrar_senha.configure(
-            text="Ocultar" if self.senha_mostrada else "Mostrar"
-        )
+        self.senha.toggle_visibility()
 
-    def _ao_pressionar_enter(self, event):
+    def _ao_pressionar_enter(self, _event):
         self.validar_login()
         return "break"
 

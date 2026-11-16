@@ -1,0 +1,4 @@
+customtkinter>=6.0,<7
+Pillow>=12.0,<13
+fontawesome-free==5.15.4
+pytest>=9.0,<10
