@@ -131,14 +131,6 @@ class TelaLogin:
             messagebox.showerror("Erro de Acesso", "Preencha o e-mail e a senha.")
             return
 
-        # Acesso de TESTE (para apresentação): admin / 1234 abre o painel do perfil escolhido
-        if email == "admin" and senha_digitada == "1234":
-            if tipo_perfil == "gestante":
-                self.master.abrir_dashboard()
-            else:
-                self.master.abrir_dashboard_profissional()
-            return
-
         # Confere no banco de dados (e-mail, senha e perfil escolhido)
         usuario = banco.validar_login(email, senha_digitada, tipo_perfil)
 

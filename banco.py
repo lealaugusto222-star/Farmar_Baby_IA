@@ -41,7 +41,7 @@ def _conferir_hash(senha, hash_guardado):
 
 
 def criar_tabelas():
-    """Cria a tabela de usuários e a conta profissional de teste, se necessário."""
+    """Cria a tabela e remove a conta profissional com a senha de demonstração."""
     with closing(_conectar()) as conexao:
         conexao.execute(
             """
@@ -57,26 +57,19 @@ def criar_tabelas():
             """
         )
 
-        # Mantém a conta profissional de teste que já existia no projeto.
-        existe = conexao.execute(
-            "SELECT 1 FROM usuarios WHERE tipo = 'profissional' LIMIT 1"
+        conta_padrao = conexao.execute(
+            """
+            SELECT senha_hash
+            FROM usuarios
+            WHERE email = ? AND tipo = ?
+            """,
+            ("profissional@farmarbaby.com", "profissional"),
         ).fetchone()
 
-        if not existe:
+        if conta_padrao and _conferir_hash("123456", conta_padrao[0]):
             conexao.execute(
-                """
-                INSERT INTO usuarios
-                    (nome, email, telefone, data_nasc, senha_hash, tipo)
-                VALUES (?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    "Profissional Teste",
-                    "profissional@farmarbaby.com",
-                    "00000000000",
-                    "01/01/1980",
-                    _gerar_hash("123456"),
-                    "profissional",
-                ),
+                "DELETE FROM usuarios WHERE email = ? AND tipo = ?",
+                ("profissional@farmarbaby.com", "profissional"),
             )
 
         conexao.commit()
