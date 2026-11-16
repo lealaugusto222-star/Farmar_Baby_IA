@@ -220,6 +220,34 @@ class TelaDashboard:
             return f"Olá, {self.usuario['nome'].split()[0].title()}! 👋"
         return "Olá, Mamãe! 👋"
 
+    def mostrar_aviso_demonstracao(self):
+        aviso = ctk.CTkFrame(
+            self.painel_conteudo,
+            fg_color="#fff8e7",
+            border_color="#f2d58a",
+            border_width=1,
+            corner_radius=9,
+        )
+        aviso.pack(fill="x", padx=25, pady=(0, 12))
+        ctk.CTkLabel(
+            aviso,
+            text="DADOS DE DEMONSTRAÇÃO (FICTÍCIOS)",
+            font=("Arial", 11, "bold"),
+            text_color="#805b13",
+            anchor="w",
+        ).pack(fill="x", padx=12, pady=(8, 0))
+        ctk.CTkLabel(
+            aviso,
+            text=(
+                "Os valores exibidos são exemplos e não representam "
+                "medições ou dados pessoais."
+            ),
+            font=("Arial", 11),
+            text_color="#805b13",
+            anchor="w",
+            wraplength=900,
+        ).pack(fill="x", padx=12, pady=(0, 8))
+
     # --- ABA 0: INÍCIO ---
     def carregar_inicio(self):
         # Saudação
@@ -237,6 +265,8 @@ class TelaDashboard:
             text_color="gray",
             anchor="w"
         ).pack(fill="x", padx=25, pady=(0, 15))
+
+        self.mostrar_aviso_demonstracao()
 
         # Card de progresso da gestação
         card_progresso = ctk.CTkFrame(self.painel_conteudo, fg_color="#feebf1", corner_radius=12)
@@ -299,6 +329,8 @@ class TelaDashboard:
 
     # --- ABA 1: CADERNETA DIGITAL ---
     def carregar_caderneta(self):
+        self.mostrar_aviso_demonstracao()
+
         # Cabeçalho com o progresso gestacional
         topo = ctk.CTkFrame(self.painel_conteudo, fg_color="#feebf1", height=80, corner_radius=12)
         topo.pack(fill="x", padx=25, pady=(25, 15))
@@ -332,6 +364,8 @@ class TelaDashboard:
         """Mostra o conteúdo de um item da caderneta, com botão para voltar à lista"""
         self.limpar_painel()
 
+        self.mostrar_aviso_demonstracao()
+
         cabecalho = ctk.CTkFrame(self.painel_conteudo, fg_color="transparent")
         cabecalho.pack(fill="x", padx=25, pady=(25, 10))
         ctk.CTkButton(
@@ -361,7 +395,29 @@ class TelaDashboard:
 
     # --- ABA 2: CHAT ASSISTENTE IA ---
     def carregar_assistente_ia(self):
-        ctk.CTkLabel(self.painel_conteudo, text="Conversar com a Assistente IA", font=("Arial", 20, "bold"), text_color="#ba4b6e").pack(pady=(20, 10))
+        ctk.CTkLabel(
+            self.painel_conteudo,
+            text="Assistente informativo automatizado",
+            font=("Arial", 20, "bold"),
+            text_color="#ba4b6e",
+        ).pack(pady=(20, 10))
+
+        aviso = ctk.CTkLabel(
+            self.painel_conteudo,
+            text=(
+                "Guia automatizado com informações gerais; não substitui "
+                "avaliação médica. Em caso de urgência, procure atendimento "
+                "imediatamente ou ligue 192 (SAMU)."
+            ),
+            fg_color="#fff3e8",
+            text_color="#8a4218",
+            corner_radius=9,
+            font=("Arial", 11, "bold"),
+            justify="left",
+            anchor="w",
+            wraplength=900,
+        )
+        aviso.pack(fill="x", padx=25, pady=(0, 8), ipady=8, ipadx=12)
 
         self.caixa_chat = ctk.CTkTextbox(self.painel_conteudo, fg_color="#f8fafc", border_color="#e2e8f0", border_width=1, corner_radius=12)
         self.caixa_chat.pack(fill="both", expand=True, padx=25, pady=10)
@@ -424,19 +480,31 @@ class TelaDashboard:
         bloco.grid(row=linha, column=coluna, padx=8, pady=5, sticky="nsew")
         ctk.CTkLabel(bloco, text=titulo, font=("Arial", 13, "bold"), text_color="#ba4b6e").pack(pady=(10, 2))
         ctk.CTkLabel(bloco, text=valor, font=("Arial", 22, "bold"), text_color="#ff6b8b").pack(pady=2)
-        ctk.CTkLabel(bloco, text=estado, font=("Arial", 11), text_color="green").pack(pady=(0, 10))
+        ctk.CTkLabel(
+            bloco,
+            text=estado,
+            font=("Arial", 11),
+            text_color="#805b13",
+        ).pack(pady=(0, 10))
 
     def carregar_monitoramento(self):
-        ctk.CTkLabel(self.painel_conteudo, text="Sinais Vitais (Sincronizado com Smartwatch)", font=("Arial", 20, "bold"), text_color="#ba4b6e").pack(pady=(20, 10))
+        self.mostrar_aviso_demonstracao()
+        ctk.CTkLabel(
+            self.painel_conteudo,
+            text="Monitoramento — Simulação / Aguardando integração",
+            font=("Arial", 18, "bold"),
+            text_color="#ba4b6e",
+            wraplength=900,
+        ).pack(pady=(4, 10))
  
         # Container grid para organizar os 4 blocos (2x2)
         painel_grid = ctk.CTkFrame(self.painel_conteudo, fg_color="transparent")
         painel_grid.pack(fill="x", padx=17)
  
-        self.criar_bloco_vital(painel_grid, 0, 0, "❤️ Batimentos", "78 BPM", "Estado: Normal")
-        self.criar_bloco_vital(painel_grid, 0, 1, "🩺 Pressão Arterial", "110/70 mmHg", "Estado: Normal")
-        self.criar_bloco_vital(painel_grid, 1, 0, "💧 Oxigênio (SpO₂)", "98%", "Estado: Normal")
-        self.criar_bloco_vital(painel_grid, 1, 1, "🌡️ Temperatura", "36,6 °C", "Estado: Normal")
+        self.criar_bloco_vital(painel_grid, 0, 0, "❤️ Batimentos", "78 BPM", "Valor simulado")
+        self.criar_bloco_vital(painel_grid, 0, 1, "🩺 Pressão Arterial", "110/70 mmHg", "Valor simulado")
+        self.criar_bloco_vital(painel_grid, 1, 0, "💧 Oxigênio (SpO₂)", "98%", "Valor simulado")
+        self.criar_bloco_vital(painel_grid, 1, 1, "🌡️ Temperatura", "36,6 °C", "Valor simulado")
  
         painel_grid.columnconfigure(0, weight=1)
         painel_grid.columnconfigure(1, weight=1)
