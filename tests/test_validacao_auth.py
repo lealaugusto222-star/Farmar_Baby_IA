@@ -20,12 +20,16 @@ class Termos:
 class Master:
     def __init__(self):
         self.paineis_abertos = []
+        self.login_aberto = False
 
     def abrir_dashboard(self, usuario=None):
         self.paineis_abertos.append(("gestante", usuario))
 
     def abrir_dashboard_profissional(self):
         self.paineis_abertos.append(("profissional", None))
+
+    def abrir_login(self):
+        self.login_aberto = True
 
 
 def _tela_login(email, senha):
@@ -132,3 +136,95 @@ def test_cadastro_aceita_senha_minima_de_oito_caracteres():
     )
 
     assert erro is None
+
+
+@pytest.mark.parametrize(
+    ("codigo", "esperado", "erro"),
+    [
+        ("codigo-valido", "codigo-valido", None),
+        ("codigo-invalido", "codigo-valido", True),
+        ("", "codigo-valido", True),
+    ],
+)
+def test_validacao_codigo_profissional(monkeypatch, codigo, esperado, erro):
+    monkeypatch.setenv("FARMAR_PROFISSIONAL_CODE", esperado)
+    resultado = _tela_cadastro().validar_codigo_profissional(codigo)
+
+    if erro:
+        assert resultado == (
+            "Código de autorização profissional inválido ou não informado."
+        )
+    else:
+        assert resultado is None
+
+
+def test_codigo_profissional_padrao_quando_variavel_ausente(monkeypatch):
+    monkeypatch.delenv("FARMAR_PROFISSIONAL_CODE", raising=False)
+
+    assert _tela_cadastro().validar_codigo_profissional(
+        cadastro.CODIGO_PROFISSIONAL_PADRAO
+    ) is None
+
+
+def test_cadastro_profissional_valida_codigo_e_envia_tipo_ao_banco(monkeypatch):
+    tela = _tela_cadastro()
+    tela.nome = Campo("Ana Souza")
+    tela.email = Campo("ana@example.com")
+    tela.telefone = Campo("11987654321")
+    tela.data_nasc = Campo("10/05/1995")
+    tela.senha = Campo("senha123")
+    tela.conf_senha = Campo("senha123")
+    tela.perfil_selecionado = Campo("profissional")
+    tela.codigo_autorizacao = Campo("codigo-valido")
+    tela.master = Master()
+    chamadas_banco = []
+    monkeypatch.setenv("FARMAR_PROFISSIONAL_CODE", "codigo-valido")
+    monkeypatch.setattr(
+        cadastro.banco,
+        "cadastrar_usuario",
+        lambda *args, **kwargs: (
+            chamadas_banco.append((args, kwargs))
+            or (True, "Cadastro realizado com sucesso!")
+        ),
+    )
+    monkeypatch.setattr(cadastro.messagebox, "showinfo", lambda *args: None)
+
+    tela.executar_cadastro()
+
+    assert len(chamadas_banco) == 1
+    assert chamadas_banco[0][1]["tipo"] == "profissional"
+    assert tela.master.login_aberto
+
+
+@pytest.mark.parametrize("codigo", ["codigo-errado", ""])
+def test_codigo_profissional_incorreto_bloqueia_cadastro(
+    monkeypatch, codigo
+):
+    tela = _tela_cadastro()
+    tela.nome = Campo("Ana Souza")
+    tela.email = Campo("ana@example.com")
+    tela.telefone = Campo("11987654321")
+    tela.data_nasc = Campo("10/05/1995")
+    tela.senha = Campo("senha123")
+    tela.conf_senha = Campo("senha123")
+    tela.perfil_selecionado = Campo("profissional")
+    tela.codigo_autorizacao = Campo(codigo)
+    erros = []
+    chamadas_banco = []
+    monkeypatch.setenv("FARMAR_PROFISSIONAL_CODE", "codigo-valido")
+    monkeypatch.setattr(
+        cadastro.messagebox,
+        "showerror",
+        lambda *args: erros.append(args),
+    )
+    monkeypatch.setattr(
+        cadastro.banco,
+        "cadastrar_usuario",
+        lambda *args, **kwargs: chamadas_banco.append((args, kwargs)),
+    )
+
+    tela.executar_cadastro()
+
+    assert erros
+    assert "autorização" in erros[0][1].lower()
+    assert chamadas_banco == []

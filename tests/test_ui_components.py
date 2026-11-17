@@ -13,6 +13,8 @@ from ui_components import PasswordField, icon_image
         "user",
         "phone",
         "calendar",
+        "key",
+        "shield",
     ],
 )
 def test_icon_image_renders_supported_icons(name):

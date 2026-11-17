@@ -1,3 +1,5 @@
+import hmac
+import os
 import customtkinter as ctk
 import re
 from tkinter import messagebox
@@ -5,6 +7,8 @@ from datetime import datetime
 
 import banco
 from ui_components import IconEntry, PainelInstitucional, PasswordField
+
+CODIGO_PROFISSIONAL_PADRAO = "FARMAR-PRO-2026"
 
 
 class TelaCadastro:
@@ -106,10 +110,10 @@ class TelaCadastro:
             seletor_perfil,
             text="Profissional",
             height=38,
-            state="disabled",
             fg_color="#e9edf2",
             text_color="#98a2b3",
             corner_radius=8,
+            command=lambda: self.selecionar_perfil("profissional"),
         )
         self.botao_perfil_profissional.grid(
             row=0,
@@ -120,46 +124,74 @@ class TelaCadastro:
         )
         ctk.CTkLabel(
             self.conteudo_centro,
-            text="Cadastro profissional requer autorização.",
+            text="Profissionais precisam de um código de convite válido.",
             font=("Arial", 10),
             text_color="#7b8493",
             anchor="w",
         ).grid(row=4, column=0, sticky="ew", pady=(0, 13))
 
+        self.campo_autorizacao = ctk.CTkFrame(
+            self.conteudo_centro,
+            fg_color="transparent",
+        )
+        self.campo_autorizacao.grid(
+            row=5,
+            column=0,
+            sticky="ew",
+            pady=(0, 8),
+        )
+        self.campo_autorizacao.grid_columnconfigure(0, weight=1)
+        ctk.CTkLabel(
+            self.campo_autorizacao,
+            text="Código de autorização",
+            font=("Arial", 12, "bold"),
+            text_color="#344054",
+            anchor="w",
+        ).grid(row=0, column=0, sticky="ew", pady=(0, 6))
+        self.codigo_autorizacao = IconEntry(
+            self.campo_autorizacao,
+            icon="key",
+            placeholder_text="Digite o código de convite",
+            width=360,
+            height=48,
+        )
+        self.codigo_autorizacao.grid(row=1, column=0, sticky="ew")
+        self.campo_autorizacao.grid_remove()
+
         self.nome = self._criar_campo(
             "Nome completo",
             "user",
             "Nome e sobrenome",
-            5,
+            6,
         )
         self.email = self._criar_campo(
             "E-mail",
             "envelope",
             "voce@exemplo.com",
-            7,
+            8,
         )
         self.telefone = self._criar_campo(
             "Telefone com DDD",
             "phone",
             "(00) 00000-0000",
-            9,
+            10,
         )
         self.data_nasc = self._criar_campo(
             "Data de nascimento",
             "calendar",
             "DD/MM/AAAA",
-            11,
+            12,
         )
 
         self.data_nasc.bind("<KeyRelease>", self.formatar_data)
 
         self.senha = self._criar_campo_senha(
             "Senha (mínimo 8 caracteres)",
-            13,
+            14,
         )
         self.conf_senha = self._criar_campo_senha(
             "Confirmar senha",
-            15,
+            16,
         )
 
         for campo in (self.nome, self.email, self.telefone, self.data_nasc,
@@ -175,7 +207,7 @@ class TelaCadastro:
             hover_color="#e05372",
         )
         self.termos.grid(
-            row=17,
+            row=18,
             column=0,
             sticky="w",
             pady=(12, 14),
@@ -192,7 +224,7 @@ class TelaCadastro:
             command=self.executar_cadastro,
         )
         self.botao_cadastrar.grid(
-            row=18,
+            row=19,
             column=0,
             sticky="ew",
             pady=(0, 10),
@@ -207,18 +239,28 @@ class TelaCadastro:
             hover_color="#fbeef3",
             command=self.master.abrir_login,
         )
-        self.link_login.grid(row=19, column=0, pady=(0, 12))
+        self.link_login.grid(row=20, column=0, pady=(0, 12))
 
         self.master.after(100, self.nome.focus_set)
 
     def selecionar_perfil(self, tipo):
-        if tipo != "gestante":
+        if tipo not in ("gestante", "profissional"):
             return
         self.perfil_selecionado.set(tipo)
-        self.botao_perfil_gestante.configure(
-            fg_color="#ff6b8b",
-            text_color="white",
+        profissional_selecionado = tipo == "profissional"
+        self.botao_perfil_profissional.configure(
+            fg_color="#ff6b8b" if profissional_selecionado else "#e9edf2",
+            text_color="white" if profissional_selecionado else "#667085",
         )
+        self.botao_perfil_gestante.configure(
+            fg_color="#e9edf2" if profissional_selecionado else "#ff6b8b",
+            text_color="#667085" if profissional_selecionado else "white",
+        )
+        if profissional_selecionado:
+            self.campo_autorizacao.grid()
+        else:
+            self.codigo_autorizacao.delete(0, "end")
+            self.campo_autorizacao.grid_remove()
 
     def _criar_campo(self, rotulo, icone, placeholder, linha):
         ctk.CTkLabel(
@@ -315,6 +357,15 @@ class TelaCadastro:
 
         return None
 
+    def validar_codigo_profissional(self, codigo):
+        codigo_esperado = os.environ.get(
+            "FARMAR_PROFISSIONAL_CODE",
+            CODIGO_PROFISSIONAL_PADRAO,
+        )
+        if not codigo or not hmac.compare_digest(codigo, codigo_esperado):
+            return "Código de autorização profissional inválido ou não informado."
+        return None
+
     def executar_cadastro(self):
         nome = self.nome.get().strip()
         email = self.email.get().strip()
@@ -322,15 +373,29 @@ class TelaCadastro:
         data_nasc = self.data_nasc.get().strip()
         senha = self.senha.get()
         conf_senha = self.conf_senha.get()
+        tipo_perfil = self.perfil_selecionado.get()
 
         erro = self.validar_campos(nome, email, telefone, data_nasc, senha, conf_senha)
         if erro:
             messagebox.showerror("Erro no cadastro", erro)
             return
 
+        if tipo_perfil == "profissional":
+            erro = self.validar_codigo_profissional(
+                self.codigo_autorizacao.get().strip()
+            )
+            if erro:
+                messagebox.showerror("Autorização necessária", erro)
+                return
+
         try:
             sucesso, mensagem = banco.cadastrar_usuario(
-                nome, email, telefone, data_nasc, senha
+                nome,
+                email,
+                telefone,
+                data_nasc,
+                senha,
+                tipo=tipo_perfil,
             )
         except banco.ErroBanco as erro:
             messagebox.showerror("Falha no cadastro", str(erro))

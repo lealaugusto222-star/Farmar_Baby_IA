@@ -56,9 +56,20 @@ def test_login_signup_and_ui_components_initialize_and_destroy():
         assert tela_cadastro.senha.entry.winfo_exists()
         assert tela_cadastro.conf_senha.entry.winfo_exists()
         assert tela_cadastro.perfil_selecionado.get() == "gestante"
-        assert str(tela_cadastro.botao_perfil_profissional.cget("state")) == "disabled"
+        assert str(tela_cadastro.botao_perfil_profissional.cget("state")) == "normal"
+        assert not tela_cadastro.campo_autorizacao.grid_info()
+
         tela_cadastro.selecionar_perfil("profissional")
+        janela.update_idletasks()
+        assert tela_cadastro.perfil_selecionado.get() == "profissional"
+        assert tela_cadastro.codigo_autorizacao.entry.winfo_exists()
+        assert tela_cadastro.campo_autorizacao.grid_info()
+
+        tela_cadastro.selecionar_perfil("profissional")
+        assert tela_cadastro.perfil_selecionado.get() == "profissional"
+        tela_cadastro.selecionar_perfil("gestante")
         assert tela_cadastro.perfil_selecionado.get() == "gestante"
+        assert not tela_cadastro.campo_autorizacao.grid_info()
         for campo in (
             tela_cadastro.nome,
             tela_cadastro.email,

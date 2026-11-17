@@ -14,6 +14,8 @@ _ICON_GLYPHS = {
     "user": "\uf007",
     "phone": "\uf095",
     "calendar": "\uf073",
+    "key": "\uf084",
+    "shield": "\uf3ed",
 }
 _ICON_FONT = (
     "fontawesome-free/static/fontawesome_free/webfonts/fa-solid-900.ttf"
