@@ -146,3 +146,37 @@ def test_credencial_de_teste_nao_abre_painel(monkeypatch):
 
     assert tela.master.paineis_abertos == []
     assert erros
+
+
+def test_obter_usuario_retorna_dados_cadastrais_sem_hash(
+    monkeypatch, tmp_path
+):
+    caminho = _usar_banco_temporario(monkeypatch, tmp_path)
+    assert _cadastrar_gestante()[0] is True
+
+    usuario = banco.obter_usuario("ANA@example.com")
+
+    assert usuario == {
+        "id": 1,
+        "nome": "Ana Souza",
+        "email": "ana@example.com",
+        "telefone": "11987654321",
+        "data_nasc": "10/05/1995",
+        "tipo": "gestante",
+    }
+    assert "senha_hash" not in usuario
+
+    with sqlite3.connect(caminho) as conexao:
+        colunas = [
+            linha[1]
+            for linha in conexao.execute("PRAGMA table_info(usuarios)")
+        ]
+    assert colunas == [
+        "id",
+        "nome",
+        "email",
+        "telefone",
+        "data_nasc",
+        "senha_hash",
+        "tipo",
+    ]

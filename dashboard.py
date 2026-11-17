@@ -1,6 +1,11 @@
 import tkinter as tk
+from datetime import date, datetime
+import re
+from tkinter import messagebox
+
 import customtkinter as ctk
 
+import dados_locais
 from ui_components import Sidebar
 
 
@@ -123,6 +128,7 @@ class TelaDashboard:
     def __init__(self, master, usuario=None):
         self.master = master
         self.usuario = usuario # dados de quem fez login (None no acesso de teste)
+        self.registros_clinicos = self.carregar_registros_clinicos()
 
         self.container_geral = ctk.CTkFrame(
             self.master,
@@ -176,6 +182,21 @@ class TelaDashboard:
 
         self.mudar_aba("inicio")
 
+    def email_usuario(self):
+        if isinstance(self.usuario, dict):
+            return self.usuario.get("email", "").strip().lower()
+        return ""
+
+    def carregar_registros_clinicos(self):
+        email = self.email_usuario()
+        if not email:
+            return []
+        try:
+            return dados_locais.listar_registros(email)
+        except (OSError, ValueError) as erro:
+            messagebox.showerror("Falha ao carregar medições", str(erro))
+            return []
+
     def criar_botao_menu(self, texto, nome_aba):
         """Mantém compatibilidade com chamadas antigas de criação de navegação."""
         return self.sidebar.buttons[nome_aba]
@@ -206,6 +227,9 @@ class TelaDashboard:
         return "Olá, Mamãe! 👋"
 
     def mostrar_aviso_demonstracao(self):
+        if self.registros_clinicos:
+            return
+
         aviso = ctk.CTkFrame(
             self.painel_conteudo,
             fg_color="#fff8e7",
@@ -235,6 +259,12 @@ class TelaDashboard:
 
     # --- ABA 0: INÍCIO ---
     def carregar_inicio(self):
+        registro_atual = (
+            self.registros_clinicos[-1]
+            if self.registros_clinicos
+            else None
+        )
+
         # Saudação
         ctk.CTkLabel(
             self.painel_conteudo,
@@ -253,18 +283,29 @@ class TelaDashboard:
 
         self.mostrar_aviso_demonstracao()
 
+        ctk.CTkButton(
+            self.painel_conteudo,
+            text="＋ Registrar Medição / Consulta",
+            fg_color="#ff6b8b",
+            hover_color="#e05372",
+            command=self.abrir_formulario_medicao,
+        ).pack(anchor="e", padx=25, pady=(0, 10))
+
         # Card de progresso da gestação
         card_progresso =         ctk.CTkFrame(self.painel_conteudo, fg_color="#ffffff", corner_radius=12)
         card_progresso.pack(fill="x", padx=25, pady=(0, 15))
 
-        ctk.CTkLabel(card_progresso, text="24 semanas e 3 dias", font=("Arial", 20, "bold"), text_color="#ba4b6e", anchor="w").pack(fill="x", padx=20, pady=(15, 0))
-        ctk.CTkLabel(card_progresso, text="2º Trimestre", font=("Arial", 12), text_color="#d67493", anchor="w").pack(fill="x", padx=20)
+        semanas = registro_atual["semana"] if registro_atual else 24
+        trimestre = min((semanas - 1) // 13 + 1, 3)
+        ctk.CTkLabel(card_progresso, text=f"{semanas} semanas", font=("Arial", 20, "bold"), text_color="#ba4b6e", anchor="w").pack(fill="x", padx=20, pady=(15, 0))
+        ctk.CTkLabel(card_progresso, text=f"{trimestre}º Trimestre", font=("Arial", 12), text_color="#d67493", anchor="w").pack(fill="x", padx=20)
 
         barra = ctk.CTkProgressBar(card_progresso, progress_color="#ff6b8b", fg_color="white", height=10)
         barra.pack(fill="x", padx=20, pady=(10, 5))
-        barra.set(0.6)
+        barra.set(min(semanas / 40, 1.0) if registro_atual else 0.6)
 
-        ctk.CTkLabel(card_progresso, text="Você já percorreu 60% da jornada!", font=("Arial", 11), text_color="#d67493", anchor="w").pack(fill="x", padx=20, pady=(0, 15))
+        progresso = min(round(semanas / 40 * 100), 100) if registro_atual else 60
+        ctk.CTkLabel(card_progresso, text=f"Progresso estimado: {progresso}% da gestação", font=("Arial", 11), text_color="#d67493", anchor="w").pack(fill="x", padx=20, pady=(0, 15))
 
         # 3 cards de resumo (próxima consulta, batimento do bebê, peso)
         linha_cards = ctk.CTkFrame(self.painel_conteudo, fg_color="transparent")
@@ -273,9 +314,23 @@ class TelaDashboard:
             linha_cards.columnconfigure(coluna, weight=1)
 
         resumos = [
-            ("📅 Próxima consulta", "22/Out", "14:00"),
-            ("❤️ Batimento do bebê", "145", "bpm"),
-            ("⚖️ Peso", "68,2", "kg"),
+            (
+                "📅 Próxima consulta",
+                self.formatar_data(registro_atual["proxima_consulta"])
+                if registro_atual else "22/Out",
+                "Data informada" if registro_atual else "Exemplo",
+            ),
+            (
+                "🤰 Semana gestacional",
+                str(semanas) if registro_atual else "24",
+                "semana" if registro_atual else "Exemplo",
+            ),
+            (
+                "⚖️ Peso",
+                str(registro_atual["peso"]).replace(".", ",")
+                if registro_atual else "68,2",
+                "kg" if registro_atual else "Exemplo",
+            ),
         ]
         for coluna, (titulo, valor, detalhe) in enumerate(resumos):
             card = ctk.CTkFrame(linha_cards, fg_color="#fff5f7", border_color="#fcd0df", border_width=1, corner_radius=12)
@@ -306,6 +361,103 @@ class TelaDashboard:
                 height=30,
                 command=lambda p=pergunta: self.perguntar_pela_inicio(p)
             ).pack(side="left", padx=(0, 8))
+
+    @staticmethod
+    def formatar_data(data_iso):
+        try:
+            return datetime.strptime(data_iso, "%Y-%m-%d").strftime("%d/%m/%Y")
+        except ValueError:
+            return data_iso
+
+    def abrir_formulario_medicao(self):
+        janela = ctk.CTkToplevel(self.master)
+        janela.title("Registrar medição ou consulta")
+        janela.geometry("420x430")
+        janela.transient(self.master)
+        janela.grab_set()
+
+        ctk.CTkLabel(
+            janela,
+            text="Registrar medição / consulta",
+            font=("Arial", 18, "bold"),
+        ).pack(padx=20, pady=(20, 12))
+
+        campos = {}
+        for chave, rotulo, exemplo in (
+            ("semana", "Semana gestacional (1 a 42)", "24"),
+            ("peso", "Peso atual (kg)", "68.2"),
+            ("pressao", "Pressão arterial (ex.: 120/80)", "120/80"),
+            ("proxima_consulta", "Próxima consulta (DD/MM/AAAA)", "22/10/2026"),
+        ):
+            ctk.CTkLabel(janela, text=rotulo, anchor="w").pack(
+                fill="x", padx=24, pady=(8, 2)
+            )
+            campo = ctk.CTkEntry(janela, placeholder_text=exemplo)
+            campo.pack(fill="x", padx=24)
+            campos[chave] = campo
+
+        def salvar():
+            email = self.email_usuario()
+            if not email:
+                messagebox.showerror(
+                    "Conta necessária",
+                    "Entre em uma conta de gestante para salvar medições.",
+                    parent=janela,
+                )
+                return
+
+            try:
+                semana = int(campos["semana"].get().strip())
+                peso = float(campos["peso"].get().strip().replace(",", "."))
+                pressao = campos["pressao"].get().strip()
+                if not 1 <= semana <= 42:
+                    raise ValueError("A semana gestacional deve estar entre 1 e 42.")
+                if not 20 <= peso <= 300:
+                    raise ValueError("Informe um peso válido em quilogramas.")
+                valores_pressao = re.fullmatch(r"(\d{2,3})/(\d{2,3})", pressao)
+                if not valores_pressao:
+                    raise ValueError("Informe a pressão no formato sistólica/diastólica.")
+                sistolica, diastolica = (
+                    int(valor) for valor in valores_pressao.groups()
+                )
+                if not 20 <= sistolica <= 300 or not 20 <= diastolica <= 200:
+                    raise ValueError("Informe valores válidos para a pressão arterial.")
+                consulta = datetime.strptime(
+                    campos["proxima_consulta"].get().strip(), "%d/%m/%Y"
+                ).date()
+                if consulta < date.today():
+                    raise ValueError("A próxima consulta não pode estar no passado.")
+            except ValueError as erro:
+                messagebox.showerror("Dados inválidos", str(erro), parent=janela)
+                return
+
+            registro = {
+                "semana": semana,
+                "peso": peso,
+                "pressao": pressao,
+                "proxima_consulta": consulta.isoformat(),
+                "registrado_em": datetime.now().isoformat(timespec="seconds"),
+            }
+            try:
+                dados_locais.salvar_registro(email, registro)
+            except (OSError, ValueError) as erro:
+                messagebox.showerror(
+                    "Falha ao salvar medição", str(erro), parent=janela
+                )
+                return
+
+            self.registros_clinicos = self.carregar_registros_clinicos()
+            janela.destroy()
+            self.mudar_aba("inicio")
+
+        ctk.CTkButton(
+            janela,
+            text="Salvar registro",
+            fg_color="#ff6b8b",
+            hover_color="#e05372",
+            command=salvar,
+        ).pack(pady=20)
+        return janela
 
     def perguntar_pela_inicio(self, pergunta):
         """Abre a aba da IA e já envia a pergunta escolhida"""
@@ -474,9 +626,10 @@ class TelaDashboard:
 
     def carregar_monitoramento(self):
         self.mostrar_aviso_demonstracao()
+        registro = self.registros_clinicos[-1] if self.registros_clinicos else None
         ctk.CTkLabel(
             self.painel_conteudo,
-            text="Monitoramento — Simulação / Aguardando integração",
+            text="Monitoramento — medições registradas" if registro else "Monitoramento — Simulação / Aguardando integração",
             font=("Arial", 18, "bold"),
             text_color="#ba4b6e",
             wraplength=900,
@@ -486,10 +639,22 @@ class TelaDashboard:
         painel_grid = ctk.CTkFrame(self.painel_conteudo, fg_color="transparent")
         painel_grid.pack(fill="x", padx=17)
  
-        self.criar_bloco_vital(painel_grid, 0, 0, "❤️ Batimentos", "78 BPM", "Valor simulado")
-        self.criar_bloco_vital(painel_grid, 0, 1, "🩺 Pressão Arterial", "110/70 mmHg", "Valor simulado")
-        self.criar_bloco_vital(painel_grid, 1, 0, "💧 Oxigênio (SpO₂)", "98%", "Valor simulado")
-        self.criar_bloco_vital(painel_grid, 1, 1, "🌡️ Temperatura", "36,6 °C", "Valor simulado")
+        if registro:
+            vitais = (
+                ("🤰 Semana gestacional", f'{registro["semana"]} semanas', "Informado pela gestante"),
+                ("🩺 Pressão arterial", f'{registro["pressao"]} mmHg', "Informada pela gestante"),
+                ("⚖️ Peso", f'{registro["peso"]} kg', "Informado pela gestante"),
+                ("📅 Próxima consulta", self.formatar_data(registro["proxima_consulta"]), "Data informada"),
+            )
+            for indice, (titulo, valor, estado) in enumerate(vitais):
+                self.criar_bloco_vital(
+                    painel_grid, indice // 2, indice % 2, titulo, valor, estado
+                )
+        else:
+            self.criar_bloco_vital(painel_grid, 0, 0, "❤️ Batimentos", "78 BPM", "Valor simulado")
+            self.criar_bloco_vital(painel_grid, 0, 1, "🩺 Pressão Arterial", "110/70 mmHg", "Valor simulado")
+            self.criar_bloco_vital(painel_grid, 1, 0, "💧 Oxigênio (SpO₂)", "98%", "Valor simulado")
+            self.criar_bloco_vital(painel_grid, 1, 1, "🌡️ Temperatura", "36,6 °C", "Valor simulado")
  
         painel_grid.columnconfigure(0, weight=1)
         painel_grid.columnconfigure(1, weight=1)
@@ -500,7 +665,7 @@ class TelaDashboard:
  
         ctk.CTkLabel(
             card_grafico,
-            text="📈 Histórico de batimentos (últimos 7 dias)",
+            text="📈 Histórico de peso registrado" if self.registros_clinicos else "📈 Histórico de batimentos (últimos 7 dias)",
             font=("Arial", 13, "bold"),
             text_color="#ba4b6e",
             anchor="w"
@@ -508,8 +673,18 @@ class TelaDashboard:
  
         canvas = tk.Canvas(card_grafico, bg="#fff5f7", highlightthickness=0, height=120)
         canvas.pack(fill="both", expand=True, padx=10, pady=(0, 10))
+        if self.registros_clinicos:
+            historico = self.registros_clinicos[-7:]
+            dias = [
+                datetime.fromisoformat(item["registrado_em"]).strftime("%d/%m")
+                for item in historico
+            ]
+            valores = [float(item["peso"]) for item in historico]
+        else:
+            dias = self.HISTORICO_DIAS
+            valores = self.HISTORICO_BPM
         # Redesenha sempre que o tamanho do canvas mudar (inclui o primeiro desenho)
-        canvas.bind("<Configure>", lambda event: self.desenhar_grafico(canvas, self.HISTORICO_DIAS, self.HISTORICO_BPM))
+        canvas.bind("<Configure>", lambda event: self.desenhar_grafico(canvas, dias, valores))
  
     def desenhar_grafico(self, canvas, dias, valores):
         """Desenha um gráfico de linha simples direto no Canvas (sem bibliotecas extras)"""
@@ -537,7 +712,7 @@ class TelaDashboard:
         pontos = []
         total = len(valores)
         for i, (dia, valor) in enumerate(zip(dias, valores)):
-            x = margem_esq + area_larg * i / (total - 1)
+            x = margem_esq + area_larg * i / max(total - 1, 1)
             y = margem_topo + area_alt * (maximo - valor) / (maximo - minimo)
             pontos.append((x, y))
             canvas.create_text(x, altura - margem_base / 2, text=dia, fill="gray", font=("Arial", 9))

@@ -16,11 +16,13 @@ O sistema oferece dois perfis:
 | `main.py` | Inicializa a janela principal e encaminha a navegação entre login, cadastro e painéis. |
 | `login.py` | Apresenta a tela de login e direciona a pessoa autenticada ao painel correspondente ao seu perfil. |
 | `cadastro.py` | Apresenta o cadastro, valida os dados informados e exige o código de autorização para o perfil profissional. |
-| `dashboard.py` | Implementa o painel da gestante e suas seções de acompanhamento. |
-| `dashboard_profissional.py` | Implementa o painel profissional e a visualização de pacientes e informações relacionadas. |
+| `dashboard.py` | Implementa o painel interativo da gestante, com registro de medições, consultas e visualização do histórico. |
+| `dashboard_profissional.py` | Implementa os detalhes das pacientes, observações, agenda de consultas e gerenciamento de alertas no painel profissional. |
 | `banco.py` | Centraliza a persistência SQLite, a criação da tabela de usuários, o cadastro, a autenticação e a geração/verificação de hashes de senha. |
+| `dados_locais.py` | Persiste medições, observações, agenda e resoluções de alertas em JSON, sem alterar a tabela SQLite `usuarios`. |
 | `ui_components.py` | Reúne componentes visuais reutilizáveis pelas telas da aplicação. |
 | `farmar_baby.db` | Banco de dados SQLite criado ou utilizado na pasta do projeto. |
+| `dados_clinicos.json` | Arquivo local, ignorado pelo Git, com medições, observações, consultas e alertas resolvidos. Criado quando há dados a salvar. |
 | `tests/` | Testes automatizados do banco, da autenticação, dos componentes visuais e da inicialização das telas. |
 
 ## Instalação e execução
@@ -77,6 +79,12 @@ A tabela `usuarios` contém os seguintes campos:
 As senhas são processadas com **PBKDF2-HMAC-SHA256**, usando um salt aleatório de 16 bytes e 100.000 iterações. O valor persistido em `senha_hash` combina o salt e o resultado hexadecimal, no formato `salt_hex:hash_hex`; a verificação compara os hashes de forma segura.
 
 O módulo `banco.py` concentra as operações e usa consultas parametrizadas. A definição acima documenta o esquema atualmente esperado e serve de referência para uma futura integração ou migração do banco de dados.
+
+## Dados interativos locais
+
+A gestante pode registrar semana gestacional, peso, pressão arterial e próxima consulta. O painel profissional pode consultar os dados cadastrais, salvar observações e agendar/concluir consultas; os alertas ativos também podem ser filtrados e resolvidos. Esses dados adicionais são armazenados em `dados_clinicos.json`, separados do SQLite, portanto não criam nem alteram colunas da tabela `usuarios`.
+
+O arquivo JSON fica na pasta do projeto, é ignorado pelo Git e não é sincronizado entre computadores. Como contém informações pessoais e clínicas e não é criptografado pela aplicação, mantenha o dispositivo protegido e não compartilhe esse arquivo.
 
 ## Testes automatizados
 

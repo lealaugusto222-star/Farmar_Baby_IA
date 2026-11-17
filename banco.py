@@ -190,3 +190,30 @@ def listar_usuarios(tipo="gestante"):
         }
         for linha in linhas
     ]
+
+
+def obter_usuario(email):
+    """Retorna dados cadastrais de um usuário, sem expor o hash da senha."""
+    criar_tabelas()
+
+    with _conectar() as conexao:
+        linha = conexao.execute(
+            """
+            SELECT id, nome, email, telefone, data_nasc, tipo
+            FROM usuarios
+            WHERE email = ?
+            """,
+            (email.strip().lower(),),
+        ).fetchone()
+
+    if linha is None:
+        return None
+
+    return {
+        "id": linha[0],
+        "nome": linha[1],
+        "email": linha[2],
+        "telefone": linha[3],
+        "data_nasc": linha[4],
+        "tipo": linha[5],
+    }

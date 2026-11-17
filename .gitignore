@@ -20,3 +20,7 @@ htmlcov/
 
 # Configuracoes locais do VS Code
 .vscode/
+
+# Dados clínicos e administrativos locais
+dados_clinicos.json
+.dados_clinicos-*.tmp
