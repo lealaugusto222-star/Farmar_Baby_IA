@@ -1,112 +1,258 @@
 import customtkinter as ctk
 import re
-from tkinter import messagebox #serve para exibir mensagens de erro ou sucesso
+from tkinter import messagebox
 from datetime import datetime
 
 import banco
+from ui_components import IconEntry, PainelInstitucional, PasswordField
 
 
 class TelaCadastro:
     def __init__(self, master):
         self.master = master
 
-        # Container principal ocupando toda a tela branca
         self.painel_principal = ctk.CTkFrame(
             self.master,
-            fg_color="white",
-            corner_radius=0
+            fg_color="#f7f8fb",
+            corner_radius=0,
         )
         self.painel_principal.pack(fill="both", expand=True)
+        self.painel_principal.grid_rowconfigure(0, weight=1)
+        self.painel_principal.grid_columnconfigure(0, weight=4, minsize=280)
+        self.painel_principal.grid_columnconfigure(1, weight=6, minsize=430)
 
-        # Sub-container centralizado para os elementos
-        self.conteudo_centro = ctk.CTkFrame(
+        self.painel_institucional = PainelInstitucional(
             self.painel_principal,
-            fg_color="white"
+            mensagem=(
+                "Comece seu acompanhamento pré-natal em um espaço "
+                "feito para acolher e informar."
+            ),
         )
-        self.conteudo_centro.pack(expand=True)
+        self.painel_institucional.grid(row=0, column=0, sticky="nsew")
 
-        # Título interno do formulário
+        self.painel_formulario = ctk.CTkFrame(
+            self.painel_principal,
+            fg_color="#ffffff",
+            corner_radius=0,
+        )
+        self.painel_formulario.grid(row=0, column=1, sticky="nsew")
+        self.painel_formulario.grid_rowconfigure(0, weight=1)
+        self.painel_formulario.grid_columnconfigure(0, weight=1)
+
+        self.rolagem_formulario = ctk.CTkScrollableFrame(
+            self.painel_formulario,
+            fg_color="transparent",
+            corner_radius=0,
+        )
+        self.rolagem_formulario.grid(row=0, column=0, sticky="nsew")
+        self.rolagem_formulario.grid_columnconfigure(0, weight=1)
+
+        self.conteudo_centro = ctk.CTkFrame(
+            self.rolagem_formulario,
+            fg_color="transparent",
+            width=380,
+        )
+        self.conteudo_centro.grid(row=0, column=0, padx=30, pady=34)
+        self.conteudo_centro.grid_columnconfigure(0, weight=1)
+
         ctk.CTkLabel(
             self.conteudo_centro,
-            text="Dados Cadastrais",
+            text="Crie sua conta",
             font=("Arial", 26, "bold"),
-            text_color="#ba4b6e"
-        ).pack(pady=(20, 20))
-
-        # --- CONTAINER PARA OS CAMPOS EM DUAS COLUNAS ---
-        container_campos = ctk.CTkFrame(self.conteudo_centro, fg_color="transparent")
-        container_campos.pack(padx=10, pady=5)
-
-        # Linha 1: Nome e E-mail
-        self.nome = ctk.CTkEntry(container_campos, width=220, height=42, placeholder_text="Nome Completo", fg_color="#f8fafc", border_color="#e2e8f0", border_width=1)
-        self.nome.grid(row=0, column=0, padx=12, pady=10)
-
-        self.email = ctk.CTkEntry(container_campos, width=220, height=42, placeholder_text="E-mail", fg_color="#f8fafc", border_color="#e2e8f0", border_width=1)
-        self.email.grid(row=0, column=1, padx=12, pady=10)
-
-        # Linha 2: Telefone e Data de Nascimento
-        self.telefone = ctk.CTkEntry(container_campos, width=220, height=42, placeholder_text="Telefone (DDD)", fg_color="#f8fafc", border_color="#e2e8f0", border_width=1)
-        self.telefone.grid(row=1, column=0, padx=12, pady=10)
-
-        self.data_nasc = ctk.CTkEntry(container_campos, width=220, height=42, placeholder_text="Data de Nascimento (DD/MM/AAAA)", fg_color="#f8fafc", border_color="#e2e8f0", border_width=1)
-        self.data_nasc.grid(row=1, column=1, padx=12, pady=10)
-
-        # Vincula a função de máscara automática ao campo de data
-        self.data_nasc.bind("<KeyRelease>", self.formatar_data)
-
-        # Linha 3: Senha e Confirmar Senha
-        self.senha = ctk.CTkEntry(container_campos, width=220, height=42, placeholder_text="Senha (mín. 8 caracteres)", show="*", fg_color="#f8fafc", border_color="#e2e8f0", border_width=1)
-        self.senha.grid(row=2, column=0, padx=12, pady=10)
-
-        self.conf_senha = ctk.CTkEntry(container_campos, width=220, height=42, placeholder_text="Confirmar Senha", show="*", fg_color="#f8fafc", border_color="#e2e8f0", border_width=1)
-        self.conf_senha.grid(row=2, column=1, padx=12, pady=10)
-
-        for campo in (
-            self.nome,
-            self.email,
-            self.telefone,
-            self.data_nasc,
-            self.senha,
-            self.conf_senha,
-        ):
-            campo.bind("<Return>", self._ao_pressionar_enter)
-
-        # --- TERMOS DE USO (Checkbox) ---
-        self.termos = ctk.CTkCheckBox(
+            text_color="#243447",
+            anchor="w",
+        ).grid(row=0, column=0, sticky="ew", pady=(0, 4))
+        ctk.CTkLabel(
             self.conteudo_centro,
-            text="Li e aceito os Termos de Uso e Política de Privacidade",
-            font=("Arial", 12),
-            text_color="gray",
-            fg_color="#ff6b8b",
-            hover_color="#e05372"
+            text="Preencha seus dados para começar.",
+            font=("Arial", 13),
+            text_color="#667085",
+            anchor="w",
+        ).grid(row=1, column=0, sticky="ew", pady=(0, 18))
+
+        self.perfil_selecionado = ctk.StringVar(value="gestante")
+        ctk.CTkLabel(
+            self.conteudo_centro,
+            text="Perfil da conta",
+            font=("Arial", 12, "bold"),
+            text_color="#344054",
+            anchor="w",
+        ).grid(row=2, column=0, sticky="ew", pady=(0, 7))
+        seletor_perfil = ctk.CTkFrame(
+            self.conteudo_centro,
+            fg_color="#f8fafc",
+            corner_radius=10,
         )
-        self.termos.pack(pady=20)
-
-        # --- BOTÃO CADASTRAR ---
-        self.botao_cadastrar = ctk.CTkButton(
-            self.conteudo_centro,
-            width=464, # Ajustado para bater certinho com a largura total das colunas
-            height=45,
-            text="Cadastrar",
-            font=("Arial", 16, "bold"),
+        seletor_perfil.grid(row=3, column=0, sticky="ew", pady=(0, 2))
+        seletor_perfil.grid_columnconfigure(0, weight=1)
+        seletor_perfil.grid_columnconfigure(1, weight=1)
+        self.botao_perfil_gestante = ctk.CTkButton(
+            seletor_perfil,
+            text="Gestante",
+            height=38,
             fg_color="#ff6b8b",
             hover_color="#e05372",
             corner_radius=8,
-            command=self.executar_cadastro
+            command=lambda: self.selecionar_perfil("gestante"),
         )
-        self.botao_cadastrar.pack(pady=10)
+        self.botao_perfil_gestante.grid(
+            row=0,
+            column=0,
+            padx=4,
+            pady=4,
+            sticky="ew",
+        )
+        self.botao_perfil_profissional = ctk.CTkButton(
+            seletor_perfil,
+            text="Profissional",
+            height=38,
+            state="disabled",
+            fg_color="#e9edf2",
+            text_color="#98a2b3",
+            corner_radius=8,
+        )
+        self.botao_perfil_profissional.grid(
+            row=0,
+            column=1,
+            padx=4,
+            pady=4,
+            sticky="ew",
+        )
+        ctk.CTkLabel(
+            self.conteudo_centro,
+            text="Cadastro profissional requer autorização.",
+            font=("Arial", 10),
+            text_color="#7b8493",
+            anchor="w",
+        ).grid(row=4, column=0, sticky="ew", pady=(0, 13))
 
-        # --- LINK PARA VOLTAR AO LOGIN ---
+        self.nome = self._criar_campo(
+            "Nome completo",
+            "user",
+            "Nome e sobrenome",
+            5,
+        )
+        self.email = self._criar_campo(
+            "E-mail",
+            "envelope",
+            "voce@exemplo.com",
+            7,
+        )
+        self.telefone = self._criar_campo(
+            "Telefone com DDD",
+            "phone",
+            "(00) 00000-0000",
+            9,
+        )
+        self.data_nasc = self._criar_campo(
+            "Data de nascimento",
+            "calendar",
+            "DD/MM/AAAA",
+            11,
+        )
+
+        self.data_nasc.bind("<KeyRelease>", self.formatar_data)
+
+        self.senha = self._criar_campo_senha(
+            "Senha (mínimo 8 caracteres)",
+            13,
+        )
+        self.conf_senha = self._criar_campo_senha(
+            "Confirmar senha",
+            15,
+        )
+
+        for campo in (self.nome, self.email, self.telefone, self.data_nasc,
+                      self.senha, self.conf_senha):
+            campo.bind("<Return>", self._ao_pressionar_enter)
+
+        self.termos = ctk.CTkCheckBox(
+            self.conteudo_centro,
+            text="Li e aceito os Termos de Uso e Política de Privacidade",
+            font=("Arial", 11),
+            text_color="#667085",
+            fg_color="#ff6b8b",
+            hover_color="#e05372",
+        )
+        self.termos.grid(
+            row=17,
+            column=0,
+            sticky="w",
+            pady=(12, 14),
+        )
+
+        self.botao_cadastrar = ctk.CTkButton(
+            self.conteudo_centro,
+            height=48,
+            text="Criar conta",
+            font=("Arial", 15, "bold"),
+            fg_color="#c65378",
+            hover_color="#a94365",
+            corner_radius=12,
+            command=self.executar_cadastro,
+        )
+        self.botao_cadastrar.grid(
+            row=18,
+            column=0,
+            sticky="ew",
+            pady=(0, 10),
+        )
+
         self.link_login = ctk.CTkButton(
             self.conteudo_centro,
-            text="Já tem uma conta? Entrar",
-            font=("Arial", 12, "underline"),
+            text="Já tem uma conta?  Entrar",
+            font=("Arial", 12, "bold"),
             fg_color="transparent",
-            text_color="#ba4b6e",
-            hover_color="#feebf1",
-            command=self.master.abrir_login
+            text_color="#a94365",
+            hover_color="#fbeef3",
+            command=self.master.abrir_login,
         )
-        self.link_login.pack(pady=5)
+        self.link_login.grid(row=19, column=0, pady=(0, 12))
+
+        self.master.after(100, self.nome.focus_set)
+
+    def selecionar_perfil(self, tipo):
+        if tipo != "gestante":
+            return
+        self.perfil_selecionado.set(tipo)
+        self.botao_perfil_gestante.configure(
+            fg_color="#ff6b8b",
+            text_color="white",
+        )
+
+    def _criar_campo(self, rotulo, icone, placeholder, linha):
+        ctk.CTkLabel(
+            self.conteudo_centro,
+            text=rotulo,
+            font=("Arial", 12, "bold"),
+            text_color="#344054",
+            anchor="w",
+        ).grid(row=linha, column=0, sticky="ew", pady=(0, 6))
+        campo = IconEntry(
+            self.conteudo_centro,
+            icon=icone,
+            placeholder_text=placeholder,
+            width=360,
+            height=48,
+        )
+        campo.grid(row=linha + 1, column=0, sticky="ew", pady=(0, 12))
+        return campo
+
+    def _criar_campo_senha(self, rotulo, linha):
+        ctk.CTkLabel(
+            self.conteudo_centro,
+            text=rotulo,
+            font=("Arial", 12, "bold"),
+            text_color="#344054",
+            anchor="w",
+        ).grid(row=linha, column=0, sticky="ew", pady=(0, 6))
+        campo = PasswordField(
+            self.conteudo_centro,
+            width=360,
+            height=48,
+        )
+        campo.grid(row=linha + 1, column=0, sticky="ew", pady=(0, 12))
+        return campo
 
     def formatar_data(self, event):
         """Adiciona automaticamente as barras na data enquanto digita e limita o tamanho"""

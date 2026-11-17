@@ -1,8 +1,9 @@
 from functools import lru_cache
 from importlib.metadata import PackageNotFoundError, distribution
+import os
 
 import customtkinter as ctk
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageChops, ImageDraw, ImageFont
 
 
 _ICON_GLYPHS = {
@@ -10,10 +11,99 @@ _ICON_GLYPHS = {
     "lock": "\uf023",
     "eye": "\uf06e",
     "eye-slash": "\uf070",
+    "user": "\uf007",
+    "phone": "\uf095",
+    "calendar": "\uf073",
 }
 _ICON_FONT = (
     "fontawesome-free/static/fontawesome_free/webfonts/fa-solid-900.ttf"
 )
+
+
+def preparar_logo(caminho, altura_desejada):
+    """Recorta margens claras do logo e calcula seu tamanho proporcional."""
+    imagem = Image.open(caminho).convert("RGBA")
+    fundo = Image.new("RGBA", imagem.size, (255, 255, 255, 255))
+    fundo.alpha_composite(imagem)
+    imagem = fundo.convert("RGB")
+    diferenca = ImageChops.difference(
+        imagem,
+        Image.new("RGB", imagem.size, (255, 255, 255)),
+    )
+    caixa = diferenca.convert("L").point(
+        lambda pixel: 255 if pixel > 15 else 0
+    ).getbbox()
+    if caixa:
+        imagem = imagem.crop(caixa)
+    proporcao = imagem.width / imagem.height
+    return imagem, int(altura_desejada * proporcao), altura_desejada
+
+
+class PainelInstitucional(ctk.CTkFrame):
+    """Painel de marca compartilhado pelas telas de acesso e cadastro."""
+
+    def __init__(self, master, mensagem):
+        super().__init__(master, fg_color="#f8eaf0", corner_radius=0)
+        self.grid_columnconfigure(0, weight=1)
+        self.grid_rowconfigure(0, weight=1)
+        self.grid_rowconfigure(2, weight=1)
+
+        conteudo = ctk.CTkFrame(self, fg_color="transparent")
+        conteudo.grid(row=1, column=0, sticky="ew", padx=24, pady=24)
+        conteudo.grid_columnconfigure(0, weight=1)
+        ctk.CTkLabel(
+            conteudo,
+            text="CUIDADO QUE ACOLHE",
+            font=("Arial", 10, "bold"),
+            text_color="#9e536c",
+        ).pack(pady=(0, 14))
+
+        altura_logo = min(
+            max(int(master.winfo_screenheight() * 0.16), 135),
+            185,
+        )
+        caminho_logo = os.path.join(
+            os.path.dirname(__file__),
+            "foto_login.png",
+        )
+        try:
+            imagem, largura, altura = preparar_logo(
+                caminho_logo,
+                altura_logo,
+            )
+            self.imagem_logo = ctk.CTkImage(
+                light_image=imagem,
+                dark_image=imagem,
+                size=(largura, altura),
+            )
+            ctk.CTkLabel(
+                conteudo,
+                image=self.imagem_logo,
+                text="",
+            ).pack(pady=(0, 12))
+        except FileNotFoundError:
+            ctk.CTkLabel(
+                conteudo,
+                text="FARMAR BABY",
+                font=("Arial", 22, "bold"),
+                text_color="#b84f73",
+            ).pack(pady=(12, 24))
+
+        ctk.CTkLabel(
+            conteudo,
+            text="Cuidando de quem\ngera o futuro.",
+            font=("Arial", 21, "bold"),
+            text_color="#284b67",
+            justify="center",
+        ).pack(pady=(4, 8))
+        ctk.CTkLabel(
+            conteudo,
+            text=mensagem,
+            font=("Arial", 12),
+            text_color="#66758a",
+            justify="center",
+            wraplength=310,
+        ).pack()
 
 
 @lru_cache(maxsize=1)
@@ -32,8 +122,7 @@ def _icon_font_path():
 
 
 @lru_cache(maxsize=32)
-def icon_image(name, color="#667085", size=20):
-    """Renderiza um glifo Font Awesome em alta resolução para o CustomTkinter."""
+def _render_icon(name, color, size):
     if name not in _ICON_GLYPHS:
         raise ValueError(f"Ícone não suportado: {name}")
 
@@ -48,9 +137,14 @@ def icon_image(name, color="#667085", size=20):
         fill=color,
         anchor="mm",
     )
+    return image
+
+
+def icon_image(name, color="#667085", size=20):
+    """Renderiza um glifo vetorial em alta resolução para o CustomTkinter."""
     return ctk.CTkImage(
-        light_image=image,
-        dark_image=image,
+        light_image=_render_icon(name, color, size),
+        dark_image=_render_icon(name, color, size),
         size=(size, size),
     )
 
@@ -108,6 +202,12 @@ class IconEntry(ctk.CTkFrame):
 
     def get(self):
         return self.entry.get()
+
+    def delete(self, first, last=None):
+        self.entry.delete(first, last)
+
+    def insert(self, index, string):
+        self.entry.insert(index, string)
 
     def bind(self, sequence=None, command=None, add=None):
         if hasattr(self, "entry"):

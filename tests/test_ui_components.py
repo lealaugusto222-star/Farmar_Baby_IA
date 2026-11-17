@@ -3,7 +3,18 @@ import pytest
 from ui_components import PasswordField, icon_image
 
 
-@pytest.mark.parametrize("name", ["envelope", "lock", "eye", "eye-slash"])
+@pytest.mark.parametrize(
+    "name",
+    [
+        "envelope",
+        "lock",
+        "eye",
+        "eye-slash",
+        "user",
+        "phone",
+        "calendar",
+    ],
+)
 def test_icon_image_renders_supported_icons(name):
     image = icon_image(name, size=20)
 
