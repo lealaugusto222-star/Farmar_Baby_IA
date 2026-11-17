@@ -17,3 +17,6 @@ env/
 .pytest_cache/
 .coverage
 htmlcov/
+
+# Configuracoes locais do VS Code
+.vscode/
