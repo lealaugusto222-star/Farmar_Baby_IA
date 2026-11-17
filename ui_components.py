@@ -111,7 +111,11 @@ class IconEntry(ctk.CTkFrame):
 
     def bind(self, sequence=None, command=None, add=None):
         if hasattr(self, "entry"):
-            return self.entry.bind(sequence, command, add)
+            return self.entry.bind(
+                sequence,
+                command,
+                "+" if add is None else add,
+            )
         return super().bind(sequence, command, add)
 
     def focus_set(self):
@@ -215,7 +219,11 @@ class PasswordField(ctk.CTkFrame):
 
     def bind(self, sequence=None, command=None, add=None):
         if hasattr(self, "entry"):
-            return self.entry.bind(sequence, command, add)
+            return self.entry.bind(
+                sequence,
+                command,
+                "+" if add is None else add,
+            )
         return super().bind(sequence, command, add)
 
     def focus_set(self):
