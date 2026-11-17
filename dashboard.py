@@ -1,6 +1,8 @@
 import tkinter as tk
 import customtkinter as ctk
 
+from ui_components import Sidebar
+
 
 class TelaDashboard:
     # Respostas prontas do Assistente IA (palavra-chave -> resposta)
@@ -122,67 +124,61 @@ class TelaDashboard:
         self.master = master
         self.usuario = usuario # dados de quem fez login (None no acesso de teste)
 
-        # Container principal em toda a tela branca
-        self.container_geral = ctk.CTkFrame(self.master, fg_color="white", corner_radius=0)
+        self.container_geral = ctk.CTkFrame(
+            self.master,
+            fg_color="#f7f8fb",
+            corner_radius=0,
+        )
         self.container_geral.pack(fill="both", expand=True)
 
-        # 1. MENU LATERAL FIXO (Largura: 200px)
-        self.menu_lateral = ctk.CTkFrame(
+        nome_usuario = (
+            self.usuario.get("nome", "Gestante")
+            if isinstance(self.usuario, dict)
+            else "Gestante"
+        )
+        itens_menu = (
+            ("inicio", "Início", "home", lambda: self.mudar_aba("inicio")),
+            (
+                "caderneta",
+                "Caderneta Digital",
+                "book",
+                lambda: self.mudar_aba("caderneta"),
+            ),
+            ("ia", "Assistente IA", "comments", lambda: self.mudar_aba("ia")),
+            (
+                "monitoramento",
+                "Monitoramento",
+                "heartbeat",
+                lambda: self.mudar_aba("monitoramento"),
+            ),
+        )
+        self.sidebar = Sidebar(
             self.container_geral,
-            width=200,
-            fg_color="#feebf1", # Rosa claro da identidade visual
-            corner_radius=0
+            nome_usuario=nome_usuario,
+            perfil="Gestante",
+            itens=itens_menu,
+            comando_sair=self.master.abrir_login,
         )
-        self.menu_lateral.pack(side="left", fill="y")
-        self.menu_lateral.pack_propagate(False)
+        self.sidebar.pack(side="left", fill="y")
+        self.menu_lateral = self.sidebar
+        self.btn_inicio = self.sidebar.buttons["inicio"]
+        self.btn_caderneta = self.sidebar.buttons["caderneta"]
+        self.btn_ia = self.sidebar.buttons["ia"]
+        self.btn_monitoramento = self.sidebar.buttons["monitoramento"]
+        self.btn_sair = self.sidebar.btn_sair
 
-        # Título da Marca no Menu
-        ctk.CTkLabel(
-            self.menu_lateral,
-            text="Farmar Baby",
-            font=("Arial", 22, "bold"),
-            text_color="#ba4b6e"
-        ).pack(pady=(30, 35))
-
-        # Botões de Navegação do Menu Lateral
-        self.btn_inicio = self.criar_botao_menu("🏠 Início", "inicio")
-        self.btn_caderneta = self.criar_botao_menu("📔 Caderneta Digital", "caderneta")
-        self.btn_ia = self.criar_botao_menu("🤖 Assistente IA", "ia")
-        self.btn_monitoramento = self.criar_botao_menu("🩺 Monitoramento", "monitoramento")
-
-        # Botão de Sair (Retorna para a tela de Login)
-        self.btn_sair = ctk.CTkButton(
-            self.menu_lateral,
-            text="🚪 Sair",
-            font=("Arial", 13, "bold"),
-            fg_color="transparent",
-            text_color="#a0405e",
-            hover_color="#fca1bc",
-            command=self.master.abrir_login
+        self.painel_conteudo = ctk.CTkFrame(
+            self.container_geral,
+            fg_color="#f7f8fb",
+            corner_radius=0,
         )
-        self.btn_sair.pack(side="bottom", pady=25, padx=15, fill="x")
-
-        # 2. PAINEL DE CONTEÚDO (Onde as telas vão mudar)
-        self.painel_conteudo = ctk.CTkFrame(self.container_geral, fg_color="white", corner_radius=0)
         self.painel_conteudo.pack(side="right", fill="both", expand=True)
 
-        # Carrega a aba padrão inicial
         self.mudar_aba("inicio")
 
     def criar_botao_menu(self, texto, nome_aba):
-        """Cria um botão do menu lateral (todos começam não selecionados)"""
-        botao = ctk.CTkButton(
-            self.menu_lateral,
-            text=texto,
-            font=("Arial", 14, "bold"),
-            fg_color="transparent",
-            text_color="#ba4b6e",
-            hover_color="#fcd0df",
-            height=40,
-            command=lambda: self.mudar_aba(nome_aba)
-        )
-        botao.pack(pady=8, padx=15, fill="x")
-        return botao
+        """Mantém compatibilidade com chamadas antigas de criação de navegação."""
+        return self.sidebar.buttons[nome_aba]
 
     def limpar_painel(self):
         """Limpa o lado direito antes de desenhar a nova aba"""
@@ -192,18 +188,7 @@ class TelaDashboard:
     def mudar_aba(self, nome_aba):
         self.limpar_painel()
 
-        # Reseta as cores dos botões e destaca só o ativo
-        botoes = {
-            "inicio": self.btn_inicio,
-            "caderneta": self.btn_caderneta,
-            "ia": self.btn_ia,
-            "monitoramento": self.btn_monitoramento,
-        }
-        for nome, botao in botoes.items():
-            if nome == nome_aba:
-                botao.configure(fg_color="#ff6b8b", text_color="white")
-            else:
-                botao.configure(fg_color="transparent", text_color="#ba4b6e")
+        self.sidebar.set_active(nome_aba)
 
         if nome_aba == "inicio":
             self.carregar_inicio()
@@ -269,7 +254,7 @@ class TelaDashboard:
         self.mostrar_aviso_demonstracao()
 
         # Card de progresso da gestação
-        card_progresso = ctk.CTkFrame(self.painel_conteudo, fg_color="#feebf1", corner_radius=12)
+        card_progresso =         ctk.CTkFrame(self.painel_conteudo, fg_color="#ffffff", corner_radius=12)
         card_progresso.pack(fill="x", padx=25, pady=(0, 15))
 
         ctk.CTkLabel(card_progresso, text="24 semanas e 3 dias", font=("Arial", 20, "bold"), text_color="#ba4b6e", anchor="w").pack(fill="x", padx=20, pady=(15, 0))

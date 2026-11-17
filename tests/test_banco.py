@@ -130,8 +130,8 @@ def test_credencial_de_teste_nao_abre_painel(monkeypatch):
         def abrir_dashboard(self, usuario=None):
             self.paineis_abertos.append(("gestante", usuario))
 
-        def abrir_dashboard_profissional(self):
-            self.paineis_abertos.append(("profissional", None))
+        def abrir_dashboard_profissional(self, usuario=None):
+            self.paineis_abertos.append(("profissional", usuario))
 
     tela = login.TelaLogin.__new__(login.TelaLogin)
     tela.usuario = Campo("admin@example.com")

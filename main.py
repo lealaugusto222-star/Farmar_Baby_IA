@@ -45,11 +45,11 @@ class App(ctk.CTk):
         from dashboard import TelaDashboard
         TelaDashboard(self, usuario)
 
-    def abrir_dashboard_profissional(self):
+    def abrir_dashboard_profissional(self, usuario=None):
         self.limpar_janela()
         # Painel exclusivo do médico/profissional de saúde
         from dashboard_profissional import TelaDashboardProfissional
-        TelaDashboardProfissional(self)
+        TelaDashboardProfissional(self, usuario)
 
 
 if __name__ == "__main__":

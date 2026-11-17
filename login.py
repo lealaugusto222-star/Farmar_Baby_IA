@@ -215,4 +215,4 @@ class TelaLogin:
         if usuario["tipo"] == "gestante":
             self.master.abrir_dashboard(usuario)
         else:
-            self.master.abrir_dashboard_profissional()
+            self.master.abrir_dashboard_profissional(usuario)

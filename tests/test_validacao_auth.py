@@ -25,8 +25,8 @@ class Master:
     def abrir_dashboard(self, usuario=None):
         self.paineis_abertos.append(("gestante", usuario))
 
-    def abrir_dashboard_profissional(self):
-        self.paineis_abertos.append(("profissional", None))
+    def abrir_dashboard_profissional(self, usuario=None):
+        self.paineis_abertos.append(("profissional", usuario))
 
     def abrir_login(self):
         self.login_aberto = True
@@ -84,6 +84,21 @@ def test_login_com_email_valido_consulta_banco(monkeypatch):
     tela.validar_login()
 
     assert tela.master.paineis_abertos == [("gestante", usuario)]
+
+
+def test_login_encaminha_usuario_profissional_ao_painel(monkeypatch):
+    tela = _tela_login("dra@example.com", "senha-forte-123")
+    tela.perfil_selecionado = Campo("Profissional")
+    usuario = {
+        "nome": "Beatriz Lima",
+        "email": "dra@example.com",
+        "tipo": "profissional",
+    }
+    monkeypatch.setattr(login.banco, "validar_login", lambda *args: usuario)
+
+    tela.validar_login()
+
+    assert tela.master.paineis_abertos == [("profissional", usuario)]
 
 
 def _tela_cadastro():

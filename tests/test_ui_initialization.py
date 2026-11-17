@@ -1,18 +1,20 @@
 import customtkinter as ctk
 
 from cadastro import TelaCadastro
+from dashboard import TelaDashboard
+from dashboard_profissional import TelaDashboardProfissional
 from login import TelaLogin
+from main import App
 from ui_components import IconEntry, PasswordField
 
 
-def test_login_signup_and_ui_components_initialize_and_destroy():
-    janela = ctk.CTk()
+def test_screens_and_ui_components_initialize_and_destroy(monkeypatch):
+    janela = App()
     janela.geometry("1100x720")
     janela.withdraw()
-    janela.abrir_cadastro = lambda: None
-    janela.abrir_login = lambda: None
 
     try:
+        janela.limpar_janela()
         tela_login = TelaLogin(janela)
         componentes = ctk.CTkFrame(janela)
         campo_email = IconEntry(
@@ -46,8 +48,6 @@ def test_login_signup_and_ui_components_initialize_and_destroy():
 
         tela_cadastro = TelaCadastro(janela)
         janela.update_idletasks()
-        janela.after(120, janela.quit)
-        janela.mainloop()
 
         assert tela_cadastro.nome.entry.winfo_exists()
         assert tela_cadastro.email.entry.winfo_exists()
@@ -88,5 +88,56 @@ def test_login_signup_and_ui_components_initialize_and_destroy():
             "<KeyRelease>"
         )
         assert binding_original in binding_complementado
+
+        tela_cadastro.painel_principal.destroy()
+
+        tela_gestante = TelaDashboard(
+            janela,
+            {"nome": "Ana Souza", "tipo": "gestante"},
+        )
+        janela.update_idletasks()
+        assert tela_gestante.sidebar.winfo_exists()
+        assert tela_gestante.sidebar.buttons["inicio"].cget("text") == "Início"
+        assert tela_gestante.sidebar.nome_label.cget("text") == "Ana Souza"
+        assert tela_gestante.sidebar.perfil_label.cget("text") == "Gestante"
+        assert tela_gestante.btn_sair.winfo_exists()
+        assert tela_gestante.sidebar.winfo_children()
+        tela_gestante.mudar_aba("caderneta")
+        janela.update_idletasks()
+        tela_gestante.mudar_aba("ia")
+        janela.update_idletasks()
+        assert tela_gestante.caixa_chat.winfo_exists()
+        tela_gestante.mudar_aba("monitoramento")
+        janela.update_idletasks()
+        tela_gestante.container_geral.destroy()
+
+        monkeypatch.setattr(
+            "dashboard_profissional.banco.listar_usuarios",
+            lambda tipo: [],
+        )
+        tela_profissional = TelaDashboardProfissional(
+            janela,
+            {"nome": "Dra. Beatriz Lima", "tipo": "profissional"},
+        )
+        janela.update_idletasks()
+        assert tela_profissional.sidebar.winfo_exists()
+        assert tela_profissional.btn_pacientes.cget("text") == "Pacientes"
+        assert (
+            tela_profissional.sidebar.nome_label.cget("text")
+            == "Dra. Beatriz Lima"
+        )
+        assert tela_profissional.sidebar.perfil_label.cget("text") == "Profissional"
+        assert tela_profissional.btn_sair.winfo_exists()
+        assert tela_profissional.entrada_busca.entry.winfo_exists()
+        assert tela_profissional.entrada_busca.entry._entry.bind(
+            "<KeyRelease>"
+        )
+        tela_profissional.mudar_aba("alertas")
+        janela.update_idletasks()
+        tela_profissional.mudar_aba("agenda")
+        janela.update_idletasks()
+        tela_profissional.mudar_aba("pacientes")
+        janela.update_idletasks()
+        tela_profissional.container_geral.destroy()
     finally:
         janela.destroy()

@@ -15,6 +15,15 @@ from ui_components import PasswordField, icon_image
         "calendar",
         "key",
         "shield",
+        "home",
+        "book",
+        "comments",
+        "heartbeat",
+        "users",
+        "exclamation-triangle",
+        "calendar-check",
+        "sign-out",
+        "search",
     ],
 )
 def test_icon_image_renders_supported_icons(name):

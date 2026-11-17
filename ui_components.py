@@ -1,3 +1,4 @@
+from collections.abc import Callable, Sequence
 from functools import lru_cache
 from importlib.metadata import PackageNotFoundError, distribution
 import os
@@ -16,6 +17,15 @@ _ICON_GLYPHS = {
     "calendar": "\uf073",
     "key": "\uf084",
     "shield": "\uf3ed",
+    "home": "\uf015",
+    "book": "\uf02d",
+    "comments": "\uf086",
+    "heartbeat": "\uf21e",
+    "users": "\uf0c0",
+    "exclamation-triangle": "\uf071",
+    "calendar-check": "\uf274",
+    "sign-out": "\uf2f5",
+    "search": "\uf002",
 }
 _ICON_FONT = (
     "fontawesome-free/static/fontawesome_free/webfonts/fa-solid-900.ttf"
@@ -106,6 +116,141 @@ class PainelInstitucional(ctk.CTkFrame):
             justify="center",
             wraplength=310,
         ).pack()
+
+
+class Sidebar(ctk.CTkFrame):
+    """Navegação lateral de marca com identidade, perfil e ação de saída."""
+
+    def __init__(
+        self,
+        master,
+        nome_usuario,
+        perfil,
+        itens: Sequence[tuple[str, str, str, Callable[[], None]]],
+        comando_sair: Callable[[], None],
+        accent_color="#d7658a",
+        hover_color="#fbe7ef",
+    ):
+        super().__init__(
+            master,
+            width=238,
+            fg_color="#f8eaf0",
+            corner_radius=0,
+        )
+        self.pack_propagate(False)
+        self.accent_color = accent_color
+        self.hover_color = hover_color
+        self.buttons = {}
+
+        marca = ctk.CTkFrame(self, fg_color="transparent")
+        marca.pack(fill="x", padx=18, pady=(24, 20))
+        caminho_logo = os.path.join(
+            os.path.dirname(__file__),
+            "foto_login.png",
+        )
+        try:
+            imagem, largura, altura = preparar_logo(caminho_logo, 42)
+            self.imagem_logo = ctk.CTkImage(
+                light_image=imagem,
+                dark_image=imagem,
+                size=(largura, altura),
+            )
+            ctk.CTkLabel(
+                marca,
+                image=self.imagem_logo,
+                text="",
+            ).pack(anchor="w", pady=(0, 8))
+        except FileNotFoundError:
+            ctk.CTkLabel(
+                marca,
+                text="FARMAR BABY",
+                font=("Arial", 17, "bold"),
+                text_color="#b84f73",
+            ).pack(anchor="w", pady=(0, 8))
+
+        ctk.CTkLabel(
+            marca,
+            text="Cuidado que acolhe",
+            font=("Arial", 11),
+            text_color="#66758a",
+            anchor="w",
+        ).pack(fill="x")
+        ctk.CTkFrame(
+            self,
+            height=1,
+            fg_color="#ead8df",
+        ).pack(fill="x", padx=18, pady=(0, 16))
+
+        navegacao = ctk.CTkFrame(self, fg_color="transparent")
+        navegacao.pack(fill="x", padx=12)
+        for chave, rotulo, icone, comando in itens:
+            botao = ctk.CTkButton(
+                navegacao,
+                text=rotulo,
+                image=icon_image(icone, "#9e536c", 17),
+                compound="left",
+                anchor="w",
+                height=42,
+                font=("Arial", 12, "bold"),
+                fg_color="transparent",
+                text_color="#624b57",
+                hover_color=hover_color,
+                corner_radius=10,
+                command=comando,
+            )
+            botao.pack(fill="x", pady=3)
+            self.buttons[chave] = botao
+
+        perfil_box = ctk.CTkFrame(
+            self,
+            fg_color="#ffffff",
+            border_color="#ead8df",
+            border_width=1,
+            corner_radius=12,
+        )
+        self.nome_label = ctk.CTkLabel(
+            perfil_box,
+            text=(nome_usuario or "Usuário"),
+            font=("Arial", 12, "bold"),
+            text_color="#284b67",
+            anchor="w",
+            wraplength=176,
+        )
+        self.nome_label.pack(fill="x", padx=12, pady=(10, 0))
+        self.perfil_label = ctk.CTkLabel(
+            perfil_box,
+            text=perfil,
+            font=("Arial", 10),
+            text_color="#7b8493",
+            anchor="w",
+        )
+        self.perfil_label.pack(fill="x", padx=12, pady=(0, 10))
+
+        self.btn_sair = ctk.CTkButton(
+            self,
+            text="Sair",
+            image=icon_image("sign-out", "#9e536c", 16),
+            compound="left",
+            anchor="w",
+            height=40,
+            font=("Arial", 12, "bold"),
+            fg_color="transparent",
+            text_color="#624b57",
+            hover_color=hover_color,
+            corner_radius=10,
+            command=comando_sair,
+        )
+        self.btn_sair.pack(side="bottom", fill="x", padx=12, pady=(0, 18))
+        perfil_box.pack(side="bottom", fill="x", padx=14, pady=(12, 8))
+
+    def set_active(self, chave):
+        """Destaca o item atualmente selecionado."""
+        for nome, botao in self.buttons.items():
+            ativo = nome == chave
+            botao.configure(
+                fg_color=self.accent_color if ativo else "transparent",
+                text_color="white" if ativo else "#624b57",
+            )
 
 
 @lru_cache(maxsize=1)

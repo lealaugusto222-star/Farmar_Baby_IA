@@ -2,18 +2,18 @@ import customtkinter as ctk
 from tkinter import messagebox
 
 import banco
+from ui_components import IconEntry, Sidebar
 
 
 class TelaDashboardProfissional:
-    # Paleta profissional (azul/cinza). O rosa fica só para a gestante.
-    COR_MENU = "#1a365d"
-    COR_MENU_HOVER = "#2c5282"
-    COR_ATIVO = "#2b6cb0"
-    COR_TEXTO_MENU = "#cbd5e0"
+    COR_MENU = "#f8eaf0"
+    COR_MENU_HOVER = "#fbe7ef"
+    COR_ATIVO = "#d7658a"
+    COR_TEXTO_MENU = "#624b57"
     COR_FUNDO = "#f7fafc"
     COR_CARD = "white"
     COR_BORDA = "#e2e8f0"
-    COR_TITULO = "#1a365d"
+    COR_TITULO = "#284b67"
     COR_TEXTO = "#4a5568"
     COR_ALERTA = "#c53030"
     COR_ALERTA_FUNDO = "#fff5f5"
@@ -43,8 +43,9 @@ class TelaDashboardProfissional:
         {"nome": "Fernanda Alves", "semanas": 20, "consulta": "27/10 08:00", "bpm": 76, "pa_sis": 108, "pa_dia": 68, "spo2": 98, "temp": 36.6},
     ]
 
-    def __init__(self, master):
+    def __init__(self, master, usuario=None):
         self.master = master
+        self.usuario = usuario
 
         # Usa os cadastros reais sempre que houver gestantes no banco.
         # Se ainda não houver nenhuma, mantém a demonstração que já existia.
@@ -78,55 +79,46 @@ class TelaDashboardProfissional:
         )
         self.container_geral.pack(fill="both", expand=True)
 
-        # 1. MENU LATERAL
-        self.menu_lateral = ctk.CTkFrame(
+        nome_usuario = (
+            self.usuario.get("nome", "Profissional")
+            if isinstance(self.usuario, dict)
+            else "Profissional"
+        )
+        itens_menu = (
+            (
+                "pacientes",
+                "Pacientes",
+                "users",
+                lambda: self.mudar_aba("pacientes"),
+            ),
+            (
+                "alertas",
+                "Alertas",
+                "exclamation-triangle",
+                lambda: self.mudar_aba("alertas"),
+            ),
+            (
+                "agenda",
+                "Agenda do Dia",
+                "calendar-check",
+                lambda: self.mudar_aba("agenda"),
+            ),
+        )
+        self.sidebar = Sidebar(
             self.container_geral,
-            width=200,
-            fg_color=self.COR_MENU,
-            corner_radius=0,
-        )
-        self.menu_lateral.pack(side="left", fill="y")
-        self.menu_lateral.pack_propagate(False)
-
-        ctk.CTkLabel(
-            self.menu_lateral,
-            text="Farmar Baby",
-            font=("Arial", 22, "bold"),
-            text_color="white",
-        ).pack(pady=(30, 0))
-
-        ctk.CTkLabel(
-            self.menu_lateral,
-            text="Painel Profissional",
-            font=("Arial", 12),
-            text_color=self.COR_TEXTO_MENU,
-        ).pack(pady=(0, 30))
-
-        self.btn_pacientes = self.criar_botao_menu(
-            "👥 Pacientes", "pacientes"
-        )
-        self.btn_alertas = self.criar_botao_menu(
-            "⚠️ Alertas", "alertas"
-        )
-        self.btn_agenda = self.criar_botao_menu(
-            "📅 Agenda do Dia", "agenda"
-        )
-
-        self.btn_sair = ctk.CTkButton(
-            self.menu_lateral,
-            text="🚪 Sair",
-            font=("Arial", 13, "bold"),
-            fg_color="transparent",
-            text_color=self.COR_TEXTO_MENU,
+            nome_usuario=nome_usuario,
+            perfil="Profissional",
+            itens=itens_menu,
+            comando_sair=self.master.abrir_login,
+            accent_color=self.COR_ATIVO,
             hover_color=self.COR_MENU_HOVER,
-            command=self.master.abrir_login,
         )
-        self.btn_sair.pack(
-            side="bottom",
-            pady=25,
-            padx=15,
-            fill="x",
-        )
+        self.sidebar.pack(side="left", fill="y")
+        self.menu_lateral = self.sidebar
+        self.btn_pacientes = self.sidebar.buttons["pacientes"]
+        self.btn_alertas = self.sidebar.buttons["alertas"]
+        self.btn_agenda = self.sidebar.buttons["agenda"]
+        self.btn_sair = self.sidebar.btn_sair
 
         # 2. PAINEL DE CONTEÚDO
         self.painel_conteudo = ctk.CTkFrame(
@@ -254,23 +246,8 @@ class TelaDashboardProfissional:
 
     # --- NAVEGAÇÃO ---
     def criar_botao_menu(self, texto, nome_aba):
-        botao = ctk.CTkButton(
-            self.menu_lateral,
-            text=texto,
-            font=("Arial", 14, "bold"),
-            anchor="w",
-            fg_color="transparent",
-            text_color=self.COR_TEXTO_MENU,
-            hover_color=self.COR_MENU_HOVER,
-            height=40,
-            command=lambda: self.mudar_aba(nome_aba),
-        )
-        botao.pack(
-            pady=6,
-            padx=15,
-            fill="x",
-        )
-        return botao
+        """Mantém compatibilidade com chamadas antigas de criação de navegação."""
+        return self.sidebar.buttons[nome_aba]
 
     def limpar_painel(self):
         for componente in self.painel_conteudo.winfo_children():
@@ -279,23 +256,7 @@ class TelaDashboardProfissional:
     def mudar_aba(self, nome_aba):
         self.limpar_painel()
 
-        botoes = {
-            "pacientes": self.btn_pacientes,
-            "alertas": self.btn_alertas,
-            "agenda": self.btn_agenda,
-        }
-
-        for nome, botao in botoes.items():
-            if nome == nome_aba:
-                botao.configure(
-                    fg_color=self.COR_ATIVO,
-                    text_color="white",
-                )
-            else:
-                botao.configure(
-                    fg_color="transparent",
-                    text_color=self.COR_TEXTO_MENU,
-                )
+        self.sidebar.set_active(nome_aba)
 
         if nome_aba == "pacientes":
             self.carregar_pacientes()
@@ -454,12 +415,11 @@ class TelaDashboardProfissional:
                 text_color=self.COR_TEXTO,
             ).pack(pady=(0, 10))
 
-        self.entrada_busca = ctk.CTkEntry(
+        self.entrada_busca = IconEntry(
             self.painel_conteudo,
-            placeholder_text="🔍 Buscar paciente pelo nome...",
-            fg_color="white",
-            border_color=self.COR_BORDA,
-            height=36,
+            icon="search",
+            placeholder_text="Buscar paciente pelo nome...",
+            height=46,
         )
         self.entrada_busca.pack(
             fill="x",
