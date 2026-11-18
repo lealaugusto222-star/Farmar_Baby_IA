@@ -6,7 +6,7 @@ from tkinter import messagebox
 
 import banco
 import dados_locais
-from ui_components import IconEntry, Sidebar
+from ui_components import IconEntry, Sidebar, aplicar_mascara_digitos
 
 
 class TelaDashboardProfissional:
@@ -897,12 +897,27 @@ class TelaDashboardProfissional:
             formulario,
             placeholder_text="Data (DD/MM/AAAA)",
         )
+        self.campo_data_consulta.bind(
+            "<KeyRelease>",
+            lambda event: aplicar_mascara_digitos(
+                event, self.campo_data_consulta, (2, 2, 4)
+            ),
+        )
         self.campo_data_consulta.grid(
             row=2, column=0, padx=10, pady=8, sticky="ew"
         )
         self.campo_horario_consulta = ctk.CTkEntry(
             formulario,
             placeholder_text="Horário (HH:MM)",
+        )
+        self.campo_horario_consulta.bind(
+            "<KeyRelease>",
+            lambda event: aplicar_mascara_digitos(
+                event,
+                self.campo_horario_consulta,
+                (2, 2),
+                separador=":",
+            ),
         )
         self.campo_horario_consulta.grid(
             row=2, column=1, padx=10, pady=8, sticky="ew"

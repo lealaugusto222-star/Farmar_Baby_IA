@@ -6,7 +6,7 @@ from tkinter import messagebox
 import customtkinter as ctk
 
 import dados_locais
-from ui_components import Sidebar
+from ui_components import Sidebar, aplicar_mascara_digitos
 
 
 class TelaDashboard:
@@ -393,8 +393,19 @@ class TelaDashboard:
                 fill="x", padx=24, pady=(8, 2)
             )
             campo = ctk.CTkEntry(janela, placeholder_text=exemplo)
+            mascara = {
+                "pressao": (3, 2),
+                "proxima_consulta": (2, 2, 4),
+            }.get(chave)
+            if mascara:
+                campo.bind(
+                    "<KeyRelease>",
+                    lambda event, campo=campo, grupos=mascara:
+                        aplicar_mascara_digitos(event, campo, grupos),
+                )
             campo.pack(fill="x", padx=24)
             campos[chave] = campo
+        self.campos_medicao = campos
 
         def salvar():
             email = self.email_usuario()
@@ -719,7 +730,10 @@ class TelaDashboard:
  
         # Linha e bolinhas
         coordenadas = [c for ponto in pontos for c in ponto]
-        canvas.create_line(*coordenadas, fill="#ff6b8b", width=3, smooth=True)
+        if len(pontos) > 1:
+            canvas.create_line(
+                *coordenadas, fill="#ff6b8b", width=3, smooth=True
+            )
         for x, y in pontos:
             canvas.create_oval(x - 4, y - 4, x + 4, y + 4, fill="#ff6b8b", outline="white", width=2)
  

@@ -219,6 +219,12 @@ def test_interactive_dashboard_forms_and_patient_details_open(
         formulario_medicao = tela_gestante.abrir_formulario_medicao()
         janela.update_idletasks()
         assert formulario_medicao.winfo_exists()
+        assert tela_gestante.campos_medicao[
+            "pressao"
+        ]._entry.bind("<KeyRelease>")
+        assert tela_gestante.campos_medicao[
+            "proxima_consulta"
+        ]._entry.bind("<KeyRelease>")
         formulario_medicao.destroy()
         tela_gestante.container_geral.destroy()
 
@@ -242,12 +248,19 @@ def test_interactive_dashboard_forms_and_patient_details_open(
         assert tela_profissional.campo_data_consulta.winfo_exists()
         assert tela_profissional.campo_horario_consulta.winfo_exists()
         assert tela_profissional.campo_observacao_consulta.winfo_exists()
+        assert tela_profissional.campo_data_consulta._entry.bind(
+            "<KeyRelease>"
+        )
+        assert tela_profissional.campo_horario_consulta._entry.bind(
+            "<KeyRelease>"
+        )
         opcao_paciente = (
             f'{paciente["nome"]} ({paciente["email"]})'
         )
         tela_profissional.paciente_consulta.set(opcao_paciente)
+        data_consulta = date.today() + timedelta(days=7)
         tela_profissional.campo_data_consulta.insert(
-            0, (date.today() + timedelta(days=7)).strftime("%d/%m/%Y")
+            0, data_consulta.strftime("%d/%m/%Y")
         )
         tela_profissional.campo_horario_consulta.insert(0, "14:30")
         tela_profissional.campo_observacao_consulta.insert(0, "Retorno")

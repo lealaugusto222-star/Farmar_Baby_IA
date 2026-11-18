@@ -32,6 +32,46 @@ _ICON_FONT = (
 )
 
 
+def aplicar_mascara_digitos(event, campo, grupos, separador="/"):
+    """Formata grupos numéricos com separador durante a digitação."""
+    if event.keysym in ("BackSpace", "Delete", "Left", "Right"):
+        return
+
+    texto = campo.get()
+    cursor = event.widget.index("insert")
+    digitos_antes = sum(caractere.isdigit() for caractere in texto[:cursor])
+    digitos = "".join(caractere for caractere in texto if caractere.isdigit())
+
+    texto_formatado = ""
+    inicio = 0
+    for tamanho in grupos:
+        if inicio >= len(digitos):
+            break
+        if inicio:
+            texto_formatado += separador
+        texto_formatado += digitos[inicio:inicio + tamanho]
+        inicio += tamanho
+
+    campo.delete(0, "end")
+    campo.insert(0, texto_formatado)
+
+    if digitos_antes == 0:
+        cursor_formatado = 0
+    elif digitos_antes >= len(digitos):
+        cursor_formatado = len(texto_formatado)
+    else:
+        vistos = 0
+        cursor_formatado = len(texto_formatado)
+        for indice, caractere in enumerate(texto_formatado):
+            if caractere.isdigit():
+                vistos += 1
+                if vistos == digitos_antes:
+                    cursor_formatado = indice + 1
+                    break
+
+    event.widget.icursor(cursor_formatado)
+
+
 def preparar_logo(caminho, altura_desejada):
     """Recorta margens claras do logo e calcula seu tamanho proporcional."""
     imagem = Image.open(caminho).convert("RGBA")

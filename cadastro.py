@@ -6,7 +6,12 @@ from tkinter import messagebox
 from datetime import datetime
 
 import banco
-from ui_components import IconEntry, PainelInstitucional, PasswordField
+from ui_components import (
+    IconEntry,
+    PainelInstitucional,
+    PasswordField,
+    aplicar_mascara_digitos,
+)
 
 CODIGO_PROFISSIONAL_PADRAO = "FARMAR-PRO-2026"
 
@@ -298,27 +303,7 @@ class TelaCadastro:
 
     def formatar_data(self, event):
         """Adiciona automaticamente as barras na data enquanto digita e limita o tamanho"""
-        # Ignora teclas de controle como Backspace ou Setas para não atrapalhar o usuário apagando
-        if event.keysym in ("Backspace", "Delete", "Left", "Right"):
-            return
-
-        texto = self.data_nasc.get()
-        # Remove qualquer caractere que não seja número
-        texto_limpo = "".join([c for c in texto if c.isdigit()])
-
-        texto_formatado = ""
-
-        # Reconstrói a string inserindo as barras de forma automática
-        if len(texto_limpo) > 0:
-            texto_formatado += texto_limpo[:2]
-        if len(texto_limpo) > 2:
-            texto_formatado += "/" + texto_limpo[2:4]
-        if len(texto_limpo) > 4:
-            texto_formatado += "/" + texto_limpo[4:8] # Limita o ano em até 4 dígitos
-
-        # Atualiza o campo com o texto formatado
-        self.data_nasc.delete(0, "end")
-        self.data_nasc.insert(0, texto_formatado)
+        aplicar_mascara_digitos(event, self.data_nasc, (2, 2, 4))
 
     def _ao_pressionar_enter(self, event):
         self.executar_cadastro()
