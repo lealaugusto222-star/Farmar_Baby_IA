@@ -1,6 +1,6 @@
 # Farmar Baby IA
 
-Aplicação desktop para apoio à organização e visualização de informações relacionadas ao acompanhamento da gestação. A interface é desenvolvida com CustomTkinter, e o acesso aos dados de usuários é isolado no módulo `banco.py`, com SQLite.
+Aplicação desktop para apoio à organização e visualização de informações relacionadas ao acompanhamento da gestação. A interface é desenvolvida com CustomTkinter, e o acesso aos dados de usuários é isolado no módulo `banco.py`, com suporte a MySQL e SQLite local.
 
 ## Visão geral
 
@@ -18,7 +18,7 @@ O sistema oferece dois perfis:
 | `cadastro.py` | Apresenta o cadastro, valida os dados informados e exige o código de autorização para o perfil profissional. |
 | `dashboard.py` | Implementa o painel interativo da gestante, com registro de medições, consultas e visualização do histórico. |
 | `dashboard_profissional.py` | Implementa os detalhes das pacientes, observações, agenda de consultas e gerenciamento de alertas no painel profissional. |
-| `banco.py` | Centraliza a persistência SQLite, a criação da tabela de usuários, o cadastro, a autenticação e a geração/verificação de hashes de senha. |
+| `banco.py` | Centraliza a persistência MySQL/SQLite, a criação da tabela de usuários, o cadastro, a autenticação e a geração/verificação de hashes de senha. |
 | `dados_locais.py` | Persiste medições, observações, agenda e resoluções de alertas em JSON, sem alterar a tabela SQLite `usuarios`. |
 | `ui_components.py` | Reúne componentes visuais reutilizáveis pelas telas da aplicação. |
 | `farmar_baby.db` | Banco de dados SQLite criado ou utilizado na pasta do projeto. |
@@ -47,7 +47,25 @@ O sistema oferece dois perfis:
    python main.py
    ```
 
-O arquivo `farmar_baby.db` é armazenado na pasta do projeto. A tabela de usuários é criada automaticamente quando necessário.
+Com `DB_TYPE=sqlite` (padrão), o arquivo local `farmar_baby.db` é armazenado na pasta do projeto. A tabela de usuários é criada automaticamente quando necessário.
+
+## Conexão MySQL
+
+Para a integração com o servidor MySQL, configure as variáveis de ambiente antes de iniciar a aplicação. O padrão local é `DB_TYPE=sqlite`; a aplicação não troca silenciosamente para SQLite se a conexão MySQL explicitamente configurada falhar.
+
+No PowerShell:
+
+```powershell
+$env:DB_TYPE = "mysql"
+$env:DB_HOST = "endereco-do-servidor"
+$env:DB_PORT = "3306"
+$env:DB_USER = "usuario-da-aplicacao"
+$env:DB_PASSWORD = "senha"
+$env:DB_NAME = "farmar_baby"
+python main.py
+```
+
+O conector `mysql-connector-python` é instalado com `pip install -r requirements.txt`. Mantenha credenciais reais em variáveis de ambiente ou em um gerenciador de segredos; não as grave no código ou no Git. MySQL e SQLite usam a mesma tabela `usuarios` e os mesmos nomes de colunas.
 
 ## Cadastro profissional e código de convite
 

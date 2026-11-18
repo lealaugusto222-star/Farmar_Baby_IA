@@ -6,6 +6,7 @@ import login
 
 def _usar_banco_temporario(monkeypatch, tmp_path):
     caminho = str(tmp_path / "teste.db")
+    monkeypatch.delenv("DB_TYPE", raising=False)
     monkeypatch.setattr(banco, "CAMINHO_BANCO", caminho)
     banco.criar_tabelas()
     return caminho
