@@ -1,3 +1,5 @@
+import pytest
+
 from ui_components import aplicar_mascara_digitos
 
 
@@ -53,18 +55,27 @@ def test_mascara_data_formata_dia_mes_ano():
     assert campo.cursor == len("17/11/2026")
 
 
-def test_mascara_pressao_formata_e_backspace_apaga_normalmente():
+@pytest.mark.parametrize(
+    ("digitacao", "resultado"),
+    [
+        ("12080", "120/80"),
+        ("10070", "100/70"),
+    ],
+)
+def test_mascara_pressao_formata_e_backspace_apaga_normalmente(
+    digitacao, resultado
+):
     campo = CampoSimulado()
 
-    _digitar(campo, "12080", (3, 2))
-    assert campo.get() == "120/80"
+    _digitar(campo, digitacao, (3, 2))
+    assert campo.get() == resultado
 
     campo.texto = campo.texto[:-1]
     campo.cursor = len(campo.texto)
     aplicar_mascara_digitos(
         EventoSimulado(campo, "BackSpace"), campo, (3, 2)
     )
-    assert campo.get() == "120/8"
+    assert campo.get() == resultado[:-1]
 
 
 def test_mascara_horario_formata_hora_e_minutos():
