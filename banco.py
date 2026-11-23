@@ -5,7 +5,15 @@ import os
 import sqlite3
 from contextlib import contextmanager
 
+from dotenv import load_dotenv
 import mysql.connector
+
+load_dotenv(
+    dotenv_path=os.path.join(
+        os.path.dirname(os.path.abspath(__file__)),
+        ".env",
+    )
+)
 
 # O banco fica na mesma pasta do projeto.
 CAMINHO_BANCO = os.path.join(

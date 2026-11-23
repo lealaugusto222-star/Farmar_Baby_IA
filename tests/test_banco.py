@@ -1,7 +1,60 @@
+import os
+import shutil
 import sqlite3
+import subprocess
+import sys
 
 import banco
 import login
+
+
+def test_carrega_dotenv_da_pasta_do_modulo_sem_sobrescrever_ambiente(
+    tmp_path,
+):
+    shutil.copyfile(banco.__file__, tmp_path / "banco.py")
+    (tmp_path / ".env").write_text(
+        "\n".join(
+            (
+                "DB_TYPE=mysql",
+                "DB_HOST=host-do-arquivo",
+                "DB_PORT=3306",
+                "DB_USER=usuario-teste",
+                "DB_PASSWORD=senha-teste",
+                "DB_NAME=banco_teste",
+            )
+        ),
+        encoding="utf-8",
+    )
+    ambiente = os.environ.copy()
+    for chave in (
+        "DB_TYPE",
+        "DB_PORT",
+        "DB_USER",
+        "DB_PASSWORD",
+        "DB_NAME",
+    ):
+        ambiente.pop(chave, None)
+    ambiente["DB_HOST"] = "host-do-ambiente"
+    ambiente["PYTHONPATH"] = str(tmp_path)
+
+    subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            (
+                "import os; import banco; "
+                "assert os.environ['DB_TYPE'] == 'mysql'; "
+                "assert os.environ['DB_HOST'] == 'host-do-ambiente'; "
+                "assert os.environ['DB_PORT'] == '3306'; "
+                "assert os.environ['DB_USER'] == 'usuario-teste'; "
+                "assert os.environ['DB_PASSWORD'] == 'senha-teste'; "
+                "assert os.environ['DB_NAME'] == 'banco_teste'"
+            ),
+        ],
+        cwd=tmp_path,
+        env=ambiente,
+        check=True,
+    )
 
 
 def _usar_banco_temporario(monkeypatch, tmp_path):

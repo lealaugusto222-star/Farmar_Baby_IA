@@ -51,9 +51,9 @@ Com `DB_TYPE=sqlite` (padrão), o arquivo local `farmar_baby.db` é armazenado n
 
 ## Conexão MySQL
 
-Para a integração com o servidor MySQL, configure as variáveis de ambiente antes de iniciar a aplicação. O padrão local é `DB_TYPE=sqlite`; a aplicação não troca silenciosamente para SQLite se a conexão MySQL explicitamente configurada falhar.
+Para a integração com o servidor MySQL, copie `.env.example` para `.env` na raiz do projeto e configure as credenciais. O arquivo `.env` é carregado automaticamente ao importar `banco.py`; variáveis já definidas no ambiente têm precedência. O padrão local é `DB_TYPE=sqlite`; a aplicação não troca silenciosamente para SQLite se a conexão MySQL explicitamente configurada falhar.
 
-No PowerShell:
+Também é possível configurar as variáveis diretamente no PowerShell:
 
 ```powershell
 $env:DB_TYPE = "mysql"
