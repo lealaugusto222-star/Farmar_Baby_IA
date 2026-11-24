@@ -103,6 +103,7 @@ def _conectar_mysql():
         password=os.environ.get("DB_PASSWORD", ""),
         database=nome,
         charset="utf8mb4",
+        ssl_disabled=False,
     )
     return _ConexaoMySQL(conexao)
 
