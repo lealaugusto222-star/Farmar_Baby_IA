@@ -11,6 +11,29 @@ from main import App
 from ui_components import IconEntry, PasswordField
 
 
+def test_cadastro_screen_initializes_and_destroys():
+    janela = App()
+    janela.withdraw()
+
+    try:
+        janela.limpar_janela()
+        tela_cadastro = TelaCadastro(janela)
+        janela.update_idletasks()
+
+        assert tela_cadastro.nome.entry.winfo_exists()
+        assert tela_cadastro.email.entry.winfo_exists()
+        assert tela_cadastro.senha.entry.winfo_exists()
+        assert tela_cadastro.perfil_selecionado.get() == "gestante"
+        assert not tela_cadastro.campo_autorizacao.grid_info()
+
+        tela_cadastro.painel_principal.destroy()
+        assert not tela_cadastro.painel_principal.winfo_exists()
+    finally:
+        for callback in janela.tk.call("after", "info"):
+            janela.after_cancel(callback)
+        janela.destroy()
+
+
 def test_screens_and_ui_components_initialize_and_destroy(monkeypatch):
     janela = App()
     janela.geometry("1100x720")

@@ -1,11 +1,15 @@
+"""Tela de cadastro e regras de validação das novas contas da aplicação."""
+
 import hmac
 import os
 import customtkinter as ctk
 import re
 from tkinter import messagebox
 from datetime import datetime
+from base_model import BaseModel
 
-import banco
+
+# Componentes visuais compartilhados evitam duplicar ícones, campos e máscaras.
 from ui_components import (
     IconEntry,
     PainelInstitucional,
@@ -13,13 +17,44 @@ from ui_components import (
     aplicar_mascara_digitos,
 )
 
+
 CODIGO_PROFISSIONAL_PADRAO = "FARMAR-PRO-2026"
 
 
+class UsuarioModel(BaseModel):
+    """Acesso ao banco específico da operação de cadastro de usuários."""
+
+    def cadastrar_usuario(
+        self,
+        nome: str,
+        email: str,
+        telefone: str,
+        data_nasc: str,
+        senha: str,
+        tipo_perfil: str
+    ) -> int:
+        """Insere uma nova conta usando placeholders para evitar SQL por concatenação."""
+        query = """
+            INSERT INTO usuarios
+            (nome_completo, email, telefone, data_nascimento, senha_hast, tipo)
+            VALUES (%s, %s, %s, %s, %s, %s)
+        """
+
+        return self.execute_query(
+            query,
+            (nome, email, telefone, data_nasc, senha, tipo_perfil)
+        )
+
+
 class TelaCadastro:
+    """Constrói e controla a tela de criação de conta para gestantes e profissionais."""
+
     def __init__(self, master):
+        # Guarda o modelo de dados e a janela principal para navegação e persistência.
+        self.usuario_model = UsuarioModel()
         self.master = master
 
+        # O layout principal usa dois painéis: marca institucional e formulário.
         self.painel_principal = ctk.CTkFrame(
             self.master,
             fg_color="#f7f8fb",
@@ -56,6 +91,7 @@ class TelaCadastro:
         self.rolagem_formulario.grid(row=0, column=0, sticky="nsew")
         self.rolagem_formulario.grid_columnconfigure(0, weight=1)
 
+        # Conteúdo central concentra todos os campos e mantém largura consistente.
         self.conteudo_centro = ctk.CTkFrame(
             self.rolagem_formulario,
             fg_color="transparent",
@@ -79,6 +115,7 @@ class TelaCadastro:
             anchor="w",
         ).grid(row=1, column=0, sticky="ew", pady=(0, 18))
 
+        # O perfil selecionado determina quais campos e regras serão aplicados.
         self.perfil_selecionado = ctk.StringVar(value="gestante")
         ctk.CTkLabel(
             self.conteudo_centro,
@@ -135,6 +172,7 @@ class TelaCadastro:
             anchor="w",
         ).grid(row=4, column=0, sticky="ew", pady=(0, 13))
 
+        # Este campo fica oculto para gestantes e aparece apenas no perfil profissional.
         self.campo_autorizacao = ctk.CTkFrame(
             self.conteudo_centro,
             fg_color="transparent",
@@ -163,6 +201,7 @@ class TelaCadastro:
         self.codigo_autorizacao.grid(row=1, column=0, sticky="ew")
         self.campo_autorizacao.grid_remove()
 
+        # Cada campo personalizado recebe o rótulo, o ícone e a máscara apropriados.
         self.nome = self._criar_campo(
             "Nome completo",
             "user",
@@ -188,6 +227,7 @@ class TelaCadastro:
             12,
         )
 
+        # A máscara adiciona barras à data conforme o usuário digita.
         self.data_nasc.bind("<KeyRelease>", self.formatar_data)
 
         self.senha = self._criar_campo_senha(
@@ -199,6 +239,7 @@ class TelaCadastro:
             16,
         )
 
+        # Enter em qualquer campo principal tenta concluir o cadastro.
         for campo in (self.nome, self.email, self.telefone, self.data_nasc,
                       self.senha, self.conf_senha):
             campo.bind("<Return>", self._ao_pressionar_enter)
@@ -246,9 +287,11 @@ class TelaCadastro:
         )
         self.link_login.grid(row=20, column=0, pady=(0, 12))
 
+        # O foco inicial melhora a experiência de teclado após a tela ser aberta.
         self.master.after(100, self.nome.focus_set)
 
     def selecionar_perfil(self, tipo):
+        """Altera as cores dos botões e revela o código somente para profissionais."""
         if tipo not in ("gestante", "profissional"):
             return
         self.perfil_selecionado.set(tipo)
@@ -302,7 +345,7 @@ class TelaCadastro:
         return campo
 
     def formatar_data(self, event):
-        """Adiciona automaticamente as barras na data enquanto digita e limita o tamanho"""
+        """Adiciona barras à data enquanto digita e limita o texto ao formato DD/MM/AAAA."""
         aplicar_mascara_digitos(event, self.data_nasc, (2, 2, 4))
 
     def _ao_pressionar_enter(self, event):
@@ -310,7 +353,7 @@ class TelaCadastro:
         return "break"
 
     def validar_campos(self, nome, email, telefone, data_nasc, senha, conf_senha):
-        """Retorna uma mensagem de erro, ou None se estiver tudo certo"""
+        """Valida os dados pessoais e retorna uma mensagem de erro, ou None."""
         if not all([nome, email, telefone, data_nasc, senha, conf_senha]):
             return "Preencha todos os campos."
 
@@ -343,6 +386,7 @@ class TelaCadastro:
         return None
 
     def validar_codigo_profissional(self, codigo):
+        """Compara o código informado com o código configurado em constante segura."""
         codigo_esperado = os.environ.get(
             "FARMAR_PROFISSIONAL_CODE",
             CODIGO_PROFISSIONAL_PADRAO,
@@ -352,6 +396,7 @@ class TelaCadastro:
         return None
 
     def executar_cadastro(self):
+        """Coleta os campos, valida a conta e envia os dados ao modelo."""
         nome = self.nome.get().strip()
         email = self.email.get().strip()
         telefone = self.telefone.get().strip()
@@ -374,20 +419,36 @@ class TelaCadastro:
                 return
 
         try:
-            sucesso, mensagem = banco.cadastrar_usuario(
+                    # Converte a data para o formato aceito pelo MySQL
+            data_mysql = datetime.strptime(
+                data_nasc, "%d/%m/%Y"
+            ).strftime("%Y-%m-%d")
+
+            resultado = self.usuario_model.cadastrar_usuario(
                 nome,
                 email,
                 telefone,
-                data_nasc,
+                data_mysql,
                 senha,
-                tipo=tipo_perfil,
+                tipo_perfil
             )
-        except banco.ErroBanco as erro:
-            messagebox.showerror("Falha no cadastro", str(erro))
-            return
 
-        if sucesso:
-            messagebox.showinfo("Cadastro", mensagem + "\nAgora faça o login.")
+            print("Usuário cadastrado com sucesso! ID:", resultado)
+
+            messagebox.showinfo(
+                "Cadastro",
+                "Cadastro realizado com sucesso!"
+            )
+
             self.master.abrir_login()
-        else:
-            messagebox.showerror("Erro no cadastro", mensagem)
+
+        except Exception as erro:
+            print("\n========== ERRO NO CADASTRO ==========")
+            print("Tipo:", type(erro).__name__)
+            print("Mensagem:", repr(erro))
+            print("======================================")
+
+            messagebox.showerror(
+                "Erro no cadastro",
+                f"{type(erro).__name__}: {erro}"
+            )

@@ -4,6 +4,7 @@ import logging
 import os
 import sqlite3
 from contextlib import contextmanager
+from datetime import date, datetime
 
 from dotenv import load_dotenv
 import mysql.connector
@@ -25,11 +26,11 @@ logger = logging.getLogger(__name__)
 
 _DDL_SQLITE = """
     CREATE TABLE IF NOT EXISTS usuarios (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        nome TEXT NOT NULL,
+        id_usuario INTEGER PRIMARY KEY AUTOINCREMENT,
+        nome_completo TEXT NOT NULL,
         email TEXT NOT NULL UNIQUE,
         telefone TEXT NOT NULL,
-        data_nasc TEXT NOT NULL,
+        data_nascimento DATE NOT NULL,
         senha_hash TEXT NOT NULL,
         tipo TEXT NOT NULL DEFAULT 'gestante'
     )
@@ -37,11 +38,11 @@ _DDL_SQLITE = """
 
 _DDL_MYSQL = """
     CREATE TABLE IF NOT EXISTS usuarios (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        nome TEXT NOT NULL,
+        id_usuario INT AUTO_INCREMENT PRIMARY KEY,
+        nome_completo TEXT NOT NULL,
         email VARCHAR(255) NOT NULL UNIQUE,
         telefone TEXT NOT NULL,
-        data_nasc TEXT NOT NULL,
+        data_nascimento DATE NOT NULL,
         senha_hash VARCHAR(255) NOT NULL,
         tipo VARCHAR(32) NOT NULL DEFAULT 'gestante'
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
@@ -156,12 +157,74 @@ def _conferir_hash(senha, hash_guardado):
         return False
 
 
+def _verificar_senha(senha, credencial):
+    """Valida hash PBKDF2 ou senha legada e sinaliza migração necessária."""
+    try:
+        salt_hex, digest_hex = credencial.split(":")
+        salt = bytes.fromhex(salt_hex)
+        digest = bytes.fromhex(digest_hex)
+    except (AttributeError, ValueError):
+        salt = digest = None
+
+    if salt is not None and len(salt) == 16 and len(digest) == 32:
+        return _conferir_hash(senha, credencial), False
+
+    return hmac.compare_digest(senha.encode("utf-8"), credencial.encode("utf-8")), True
+
+
+def _data_para_banco(data_nasc):
+    """Converte a data da tela para o formato ISO usado no banco."""
+    if isinstance(data_nasc, (date, datetime)):
+        return data_nasc.strftime("%Y-%m-%d")
+
+    data_nasc = data_nasc.strip()
+    for formato in ("%d/%m/%Y", "%Y-%m-%d"):
+        try:
+            return datetime.strptime(data_nasc, formato).strftime("%Y-%m-%d")
+        except ValueError:
+            continue
+    raise ValueError("Data de nascimento inválida.")
+
+
+def _data_para_tela(data_nasc):
+    """Converte a data ISO do banco para o formato exibido pela tela."""
+    if isinstance(data_nasc, (date, datetime)):
+        return data_nasc.strftime("%d/%m/%Y")
+
+    data_nasc = str(data_nasc)
+    if "/" in data_nasc:
+        return data_nasc
+    return datetime.strptime(data_nasc, "%Y-%m-%d").strftime("%d/%m/%Y")
+
+
+def _migrar_colunas_sqlite(conexao):
+    """Renomeia colunas do esquema SQLite anterior sem perder registros."""
+    colunas = {
+        linha[1]
+        for linha in conexao.execute("PRAGMA table_info(usuarios)").fetchall()
+    }
+    for antiga, nova in (
+        ("id", "id_usuario"),
+        ("nome", "nome_completo"),
+        ("data_nasc", "data_nascimento"),
+    ):
+        if antiga in colunas and nova not in colunas:
+            conexao.execute(
+                f"ALTER TABLE usuarios RENAME COLUMN {antiga} TO {nova}"
+            )
+            colunas.remove(antiga)
+            colunas.add(nova)
+
+
 def criar_tabelas():
     """Cria a tabela e remove a conta profissional com a senha de demonstração."""
     with _conectar() as conexao:
+        tipo = _tipo_banco()
         conexao.execute(
-            _DDL_MYSQL if _tipo_banco() == "mysql" else _DDL_SQLITE
+            _DDL_MYSQL if tipo == "mysql" else _DDL_SQLITE
         )
+        if tipo == "sqlite":
+            _migrar_colunas_sqlite(conexao)
 
         conta_padrao = conexao.execute(
             """
@@ -183,6 +246,10 @@ def cadastrar_usuario(nome, email, telefone, data_nasc, senha, tipo="gestante"):
     """Cadastra usuário. Retorna (True, mensagem) ou (False, motivo)."""
     if tipo not in ("gestante", "profissional"):
         return False, "Tipo de usuário inválido."
+    try:
+        data_nascimento = _data_para_banco(data_nasc)
+    except (AttributeError, ValueError):
+        return False, "Data de nascimento inválida."
 
     try:
         criar_tabelas()
@@ -191,14 +258,14 @@ def cadastrar_usuario(nome, email, telefone, data_nasc, senha, tipo="gestante"):
                 conexao.execute(
                     """
                     INSERT INTO usuarios
-                        (nome, email, telefone, data_nasc, senha_hash, tipo)
+                        (nome_completo, email, telefone, data_nascimento, senha_hash, tipo)
                     VALUES (?, ?, ?, ?, ?, ?)
                     """,
                     (
                         nome.strip(),
                         email.strip().lower(),
                         telefone.strip(),
-                        data_nasc.strip(),
+                        data_nascimento,
                         _gerar_hash(senha),
                         tipo,
                     ),
@@ -219,20 +286,29 @@ def validar_login(email, senha, tipo="gestante"):
     with _conectar() as conexao:
         linha = conexao.execute(
             """
-            SELECT nome, email, tipo, senha_hash
+            SELECT nome_completo, email, tipo, senha_hash
             FROM usuarios
             WHERE email = ?
             """,
             (email.strip().lower(),),
         ).fetchone()
 
-    if linha is None:
-        return None
+        if linha is None:
+            return None
 
-    nome, email_banco, tipo_banco, senha_hash = linha
-
-    if tipo_banco != tipo or not _conferir_hash(senha, senha_hash):
-        return None
+        nome, email_banco, tipo_banco, credencial = linha
+        senha_valida, migrar_hash = _verificar_senha(senha, credencial)
+        if tipo_banco != tipo or not senha_valida:
+            return None
+        if migrar_hash:
+            conexao.execute(
+                """
+                UPDATE usuarios
+                SET senha_hash = ?
+                WHERE email = ? AND senha_hash = ?
+                """,
+                (_gerar_hash(senha), email_banco, credencial),
+            )
 
     return {
         "nome": nome,
@@ -257,10 +333,10 @@ def listar_usuarios(tipo="gestante"):
     with _conectar() as conexao:
         linhas = conexao.execute(
             """
-            SELECT id, nome, email, tipo
+            SELECT id_usuario, nome_completo, email, tipo
             FROM usuarios
             WHERE tipo = ?
-            ORDER BY LOWER(nome)
+            ORDER BY LOWER(nome_completo)
             """,
             (tipo,),
         ).fetchall()
@@ -283,7 +359,7 @@ def obter_usuario(email):
     with _conectar() as conexao:
         linha = conexao.execute(
             """
-            SELECT id, nome, email, telefone, data_nasc, tipo
+            SELECT id_usuario, nome_completo, email, telefone, data_nascimento, tipo
             FROM usuarios
             WHERE email = ?
             """,
@@ -298,6 +374,6 @@ def obter_usuario(email):
         "nome": linha[1],
         "email": linha[2],
         "telefone": linha[3],
-        "data_nasc": linha[4],
+        "data_nasc": _data_para_tela(linha[4]),
         "tipo": linha[5],
     }

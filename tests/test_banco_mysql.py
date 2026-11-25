@@ -70,6 +70,7 @@ def test_mysql_configura_conexao_ddl_placeholders_e_transacao(monkeypatch):
         "password": "senha-de-teste",
         "database": "farmar_baby",
         "charset": "utf8mb4",
+        "ssl_disabled": False,
     }
     consultas = conexao.cursor_simulado.consultas
     assert "AUTO_INCREMENT" in consultas[0][0]
@@ -77,11 +78,11 @@ def test_mysql_configura_conexao_ddl_placeholders_e_transacao(monkeypatch):
     assert all(
         coluna in consultas[0][0]
         for coluna in (
-            "id ",
-            "nome ",
+            "id_usuario ",
+            "nome_completo ",
             "email ",
             "telefone ",
-            "data_nasc ",
+            "data_nascimento ",
             "senha_hash ",
             "tipo ",
         )
@@ -122,8 +123,10 @@ def test_mysql_cadastro_usa_placeholders_e_hash_sem_senha_pura(monkeypatch):
         "Ana Souza",
         "ana@example.com",
         "11987654321",
-        "10/05/1995",
+        "1995-05-10",
     )
+    assert "nome_completo" in insercao[0]
+    assert "data_nascimento" in insercao[0]
     assert insercao[1][4] != "senha-forte-123"
     assert insercao[1][5] == "gestante"
 
@@ -145,11 +148,11 @@ def test_db_type_padrao_e_sqlite_fallback(monkeypatch, tmp_path, db_type):
             for linha in conexao.execute("PRAGMA table_info(usuarios)")
         ]
     assert colunas == [
-        "id",
-        "nome",
+        "id_usuario",
+        "nome_completo",
         "email",
         "telefone",
-        "data_nasc",
+        "data_nascimento",
         "senha_hash",
         "tipo",
     ]

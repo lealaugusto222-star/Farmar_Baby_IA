@@ -95,6 +95,39 @@ def test_login_com_senha_incorreta(monkeypatch, tmp_path):
     assert banco.validar_login("ana@example.com", "senha-errada") is None
 
 
+def test_login_legado_migra_senha_em_texto_puro_para_hash(
+    monkeypatch, tmp_path
+):
+    caminho = _usar_banco_temporario(monkeypatch, tmp_path)
+    with sqlite3.connect(caminho) as conexao:
+        conexao.execute(
+            """
+            INSERT INTO usuarios
+                (nome_completo, email, telefone, data_nascimento, senha_hash, tipo)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "Ana Souza",
+                "ana@example.com",
+                "11987654321",
+                "1995-05-10",
+                "senha-legada",
+                "gestante",
+            ),
+        )
+
+    usuario = banco.validar_login("ana@example.com", "senha-legada")
+
+    assert usuario["nome"] == "Ana Souza"
+    with sqlite3.connect(caminho) as conexao:
+        senha_armazenada = conexao.execute(
+            "SELECT senha_hash FROM usuarios WHERE email = ?",
+            ("ana@example.com",),
+        ).fetchone()[0]
+    assert senha_armazenada != "senha-legada"
+    assert banco._conferir_hash("senha-legada", senha_armazenada)
+
+
 def test_cadastro_com_email_duplicado(monkeypatch, tmp_path):
     _usar_banco_temporario(monkeypatch, tmp_path)
     assert _cadastrar_gestante()[0] is True
@@ -121,14 +154,14 @@ def test_remove_conta_profissional_legada_com_senha_padrao(monkeypatch, tmp_path
         conexao.execute(
             """
             INSERT INTO usuarios
-                (nome, email, telefone, data_nasc, senha_hash, tipo)
+                (nome_completo, email, telefone, data_nascimento, senha_hash, tipo)
             VALUES (?, ?, ?, ?, ?, ?)
             """,
             (
                 "Profissional Teste",
                 "profissional@farmarbaby.com",
                 "00000000000",
-                "01/01/1980",
+                "1980-01-01",
                 banco._gerar_hash("123456"),
                 "profissional",
             ),
@@ -219,6 +252,12 @@ def test_obter_usuario_retorna_dados_cadastrais_sem_hash(
         "tipo": "gestante",
     }
     assert "senha_hash" not in usuario
+    with sqlite3.connect(caminho) as conexao:
+        data_armazenada = conexao.execute(
+            "SELECT data_nascimento FROM usuarios WHERE email = ?",
+            ("ana@example.com",),
+        ).fetchone()[0]
+    assert data_armazenada == "1995-05-10"
 
     with sqlite3.connect(caminho) as conexao:
         colunas = [
@@ -226,11 +265,64 @@ def test_obter_usuario_retorna_dados_cadastrais_sem_hash(
             for linha in conexao.execute("PRAGMA table_info(usuarios)")
         ]
     assert colunas == [
-        "id",
-        "nome",
+        "id_usuario",
+        "nome_completo",
         "email",
         "telefone",
-        "data_nasc",
+        "data_nascimento",
+        "senha_hash",
+        "tipo",
+    ]
+
+
+def test_migra_colunas_do_esquema_sqlite_anterior(monkeypatch, tmp_path):
+    caminho = str(tmp_path / "legado.db")
+    monkeypatch.delenv("DB_TYPE", raising=False)
+    monkeypatch.setattr(banco, "CAMINHO_BANCO", caminho)
+    with sqlite3.connect(caminho) as conexao:
+        conexao.execute(
+            """
+            CREATE TABLE usuarios (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                nome TEXT NOT NULL,
+                email TEXT NOT NULL UNIQUE,
+                telefone TEXT NOT NULL,
+                data_nasc TEXT NOT NULL,
+                senha_hash TEXT NOT NULL,
+                tipo TEXT NOT NULL DEFAULT 'gestante'
+            )
+            """
+        )
+        conexao.execute(
+            """
+            INSERT INTO usuarios
+                (nome, email, telefone, data_nasc, senha_hash, tipo)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "Ana Souza",
+                "ana@example.com",
+                "11987654321",
+                "10/05/1995",
+                banco._gerar_hash("senha-forte-123"),
+                "gestante",
+            ),
+        )
+
+    banco.criar_tabelas()
+
+    assert banco.obter_usuario("ana@example.com")["data_nasc"] == "10/05/1995"
+    with sqlite3.connect(caminho) as conexao:
+        colunas = [
+            linha[1]
+            for linha in conexao.execute("PRAGMA table_info(usuarios)")
+        ]
+    assert colunas == [
+        "id_usuario",
+        "nome_completo",
+        "email",
+        "telefone",
+        "data_nascimento",
         "senha_hash",
         "tipo",
     ]
