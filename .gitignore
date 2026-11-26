@@ -24,3 +24,4 @@ htmlcov/
 # Dados clínicos e administrativos locais
 dados_clinicos.json
 .dados_clinicos-*.tmp
+farmar_baby.db

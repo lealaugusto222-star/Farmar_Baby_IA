@@ -2,39 +2,21 @@ import hashlib
 import hmac
 import logging
 import os
-import sqlite3
 from contextlib import contextmanager
 from datetime import date, datetime
 
-from dotenv import load_dotenv
 import mysql.connector
 
-load_dotenv(
-    dotenv_path=os.path.join(
-        os.path.dirname(os.path.abspath(__file__)),
-        ".env",
-    )
+from config_database import (
+    DatabaseConnection,
+    DatabaseConnectionError,
 )
 
-# O banco fica na mesma pasta do projeto.
-CAMINHO_BANCO = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)),
-    "farmar_baby.db",
+DatabaseConnection.load_environment(
+    os.path.dirname(os.path.abspath(__file__))
 )
 
 logger = logging.getLogger(__name__)
-
-_DDL_SQLITE = """
-    CREATE TABLE IF NOT EXISTS usuarios (
-        id_usuario INTEGER PRIMARY KEY AUTOINCREMENT,
-        nome_completo TEXT NOT NULL,
-        email TEXT NOT NULL UNIQUE,
-        telefone TEXT NOT NULL,
-        data_nascimento DATE NOT NULL,
-        senha_hash TEXT NOT NULL,
-        tipo TEXT NOT NULL DEFAULT 'gestante'
-    )
-"""
 
 _DDL_MYSQL = """
     CREATE TABLE IF NOT EXISTS usuarios (
@@ -43,7 +25,7 @@ _DDL_MYSQL = """
         email VARCHAR(255) NOT NULL UNIQUE,
         telefone TEXT NOT NULL,
         data_nascimento DATE NOT NULL,
-        senha_hash VARCHAR(255) NOT NULL,
+        senha_hast VARCHAR(255) NOT NULL,
         tipo VARCHAR(32) NOT NULL DEFAULT 'gestante'
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 """
@@ -53,75 +35,19 @@ class ErroBanco(Exception):
     """Indica uma falha de acesso ou operação no banco de dados."""
 
 
-class _ConexaoMySQL:
-    """Adapta a API de execução MySQL ao uso de execute do SQLite."""
-
-    def __init__(self, conexao):
-        self._conexao = conexao
-
-    def execute(self, consulta, parametros=()):
-        cursor = self._conexao.cursor()
-        cursor.execute(consulta.replace("?", "%s"), parametros)
-        return cursor
-
-    def commit(self):
-        self._conexao.commit()
-
-    def rollback(self):
-        self._conexao.rollback()
-
-    def close(self):
-        self._conexao.close()
-
-
-def _tipo_banco():
-    tipo = os.environ.get("DB_TYPE", "sqlite").strip().lower()
-    if tipo not in ("sqlite", "mysql"):
-        raise ErroBanco("DB_TYPE deve ser 'sqlite' ou 'mysql'.")
-    return tipo
-
-
-def _conectar_mysql():
-    host = os.environ.get("DB_HOST", "").strip()
-    usuario = os.environ.get("DB_USER", "").strip()
-    nome = os.environ.get("DB_NAME", "").strip()
-    if not host or not usuario or not nome:
-        raise ErroBanco(
-            "Para usar MySQL, configure DB_HOST, DB_USER e DB_NAME."
-        )
-
-    try:
-        porta = int(os.environ.get("DB_PORT", "3306"))
-    except ValueError as erro:
-        raise ErroBanco("DB_PORT deve ser um número inteiro.") from erro
-    if not 1 <= porta <= 65535:
-        raise ErroBanco("DB_PORT deve estar entre 1 e 65535.")
-
-    conexao = mysql.connector.connect(
-        host=host,
-        port=porta,
-        user=usuario,
-        password=os.environ.get("DB_PASSWORD", ""),
-        database=nome,
-        charset="utf8mb4",
-        ssl_disabled=False,
-    )
-    return _ConexaoMySQL(conexao)
-
-
 @contextmanager
 def _conectar():
     """Fornece uma conexão transacional e garante rollback e fechamento."""
-    tipo = _tipo_banco()
     conexao = None
     try:
-        if tipo == "mysql":
-            conexao = _conectar_mysql()
-        else:
-            conexao = sqlite3.connect(CAMINHO_BANCO)
+        conexao = DatabaseConnection.get_connection()
         yield conexao
         conexao.commit()
-    except (sqlite3.Error, mysql.connector.Error) as erro:
+    except DatabaseConnectionError as erro:
+        if conexao is not None:
+            conexao.rollback()
+        raise ErroBanco(str(erro)) from erro
+    except mysql.connector.Error as erro:
         if conexao is not None:
             conexao.rollback()
         logger.exception("Falha ao acessar o banco de dados.")
@@ -197,49 +123,10 @@ def _data_para_tela(data_nasc):
     return datetime.strptime(data_nasc, "%Y-%m-%d").strftime("%d/%m/%Y")
 
 
-def _migrar_colunas_sqlite(conexao):
-    """Renomeia colunas do esquema SQLite anterior sem perder registros."""
-    colunas = {
-        linha[1]
-        for linha in conexao.execute("PRAGMA table_info(usuarios)").fetchall()
-    }
-    for antiga, nova in (
-        ("id", "id_usuario"),
-        ("nome", "nome_completo"),
-        ("data_nasc", "data_nascimento"),
-    ):
-        if antiga in colunas and nova not in colunas:
-            conexao.execute(
-                f"ALTER TABLE usuarios RENAME COLUMN {antiga} TO {nova}"
-            )
-            colunas.remove(antiga)
-            colunas.add(nova)
-
-
 def criar_tabelas():
-    """Cria a tabela e remove a conta profissional com a senha de demonstração."""
+    """Cria a tabela de usuários, se necessário."""
     with _conectar() as conexao:
-        tipo = _tipo_banco()
-        conexao.execute(
-            _DDL_MYSQL if tipo == "mysql" else _DDL_SQLITE
-        )
-        if tipo == "sqlite":
-            _migrar_colunas_sqlite(conexao)
-
-        conta_padrao = conexao.execute(
-            """
-            SELECT senha_hash
-            FROM usuarios
-            WHERE email = ? AND tipo = ?
-            """,
-            ("profissional@farmarbaby.com", "profissional"),
-        ).fetchone()
-
-        if conta_padrao and _conferir_hash("123456", conta_padrao[0]):
-            conexao.execute(
-                "DELETE FROM usuarios WHERE email = ? AND tipo = ?",
-                ("profissional@farmarbaby.com", "profissional"),
-            )
+        conexao.execute(_DDL_MYSQL)
 
 
 def cadastrar_usuario(nome, email, telefone, data_nasc, senha, tipo="gestante"):
@@ -258,7 +145,7 @@ def cadastrar_usuario(nome, email, telefone, data_nasc, senha, tipo="gestante"):
                 conexao.execute(
                     """
                     INSERT INTO usuarios
-                        (nome_completo, email, telefone, data_nascimento, senha_hash, tipo)
+                        (nome_completo, email, telefone, data_nascimento, senha_hast, tipo)
                     VALUES (?, ?, ?, ?, ?, ?)
                     """,
                     (
@@ -270,7 +157,7 @@ def cadastrar_usuario(nome, email, telefone, data_nasc, senha, tipo="gestante"):
                         tipo,
                     ),
                 )
-            except (sqlite3.IntegrityError, mysql.connector.IntegrityError):
+            except mysql.connector.IntegrityError:
                 return False, "Este e-mail já está cadastrado."
 
         return True, "Cadastro realizado com sucesso!"
@@ -286,7 +173,7 @@ def validar_login(email, senha, tipo="gestante"):
     with _conectar() as conexao:
         linha = conexao.execute(
             """
-            SELECT nome_completo, email, tipo, senha_hash
+            SELECT nome_completo, email, tipo, senha_hast
             FROM usuarios
             WHERE email = ?
             """,
@@ -304,8 +191,8 @@ def validar_login(email, senha, tipo="gestante"):
             conexao.execute(
                 """
                 UPDATE usuarios
-                SET senha_hash = ?
-                WHERE email = ? AND senha_hash = ?
+                SET senha_hast = ?
+                WHERE email = ? AND senha_hast = ?
                 """,
                 (_gerar_hash(senha), email_banco, credencial),
             )

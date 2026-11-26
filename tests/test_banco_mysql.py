@@ -1,8 +1,7 @@
-import sqlite3
-
 import pytest
 
 import banco
+import config_database
 
 
 class CursorSimulado:
@@ -12,12 +11,16 @@ class CursorSimulado:
 
     def execute(self, consulta, parametros=()):
         self.consultas.append((consulta, parametros))
-        if consulta.startswith("SELECT senha_hash"):
-            self.resultado = None
         return self
 
     def fetchone(self):
         return self.resultado
+
+    def fetchall(self):
+        return []
+
+    def close(self):
+        pass
 
 
 class ConexaoSimulada:
@@ -27,7 +30,8 @@ class ConexaoSimulada:
         self.rollbacks = 0
         self.fechada = False
 
-    def cursor(self):
+    def cursor(self, dictionary=False):
+        del dictionary
         return self.cursor_simulado
 
     def commit(self):
@@ -39,10 +43,12 @@ class ConexaoSimulada:
     def close(self):
         self.fechada = True
 
+    def is_connected(self):
+        return True
+
 
 def _configurar_mysql(monkeypatch, conexao):
     configuracao = {}
-    monkeypatch.setenv("DB_TYPE", "mysql")
     monkeypatch.setenv("DB_HOST", "db.example.test")
     monkeypatch.setenv("DB_PORT", "3307")
     monkeypatch.setenv("DB_USER", "farmar_app")
@@ -53,11 +59,11 @@ def _configurar_mysql(monkeypatch, conexao):
         configuracao.update(kwargs)
         return conexao
 
-    monkeypatch.setattr(banco.mysql.connector, "connect", conectar)
+    monkeypatch.setattr(config_database.mysql.connector, "connect", conectar)
     return configuracao
 
 
-def test_mysql_configura_conexao_ddl_placeholders_e_transacao(monkeypatch):
+def test_mysql_configura_ssl_ddl_placeholders_e_transacao(monkeypatch):
     conexao = ConexaoSimulada()
     configuracao = _configurar_mysql(monkeypatch, conexao)
 
@@ -75,29 +81,17 @@ def test_mysql_configura_conexao_ddl_placeholders_e_transacao(monkeypatch):
     consultas = conexao.cursor_simulado.consultas
     assert "AUTO_INCREMENT" in consultas[0][0]
     assert "CREATE TABLE IF NOT EXISTS usuarios" in consultas[0][0]
+    assert "senha_hast VARCHAR(255) NOT NULL" in consultas[0][0]
+    assert len(consultas) == 1
     assert all(
-        coluna in consultas[0][0]
-        for coluna in (
-            "id_usuario ",
-            "nome_completo ",
-            "email ",
-            "telefone ",
-            "data_nascimento ",
-            "senha_hash ",
-            "tipo ",
-        )
-    )
-    assert "?" not in consultas[1][0]
-    assert "%s" in consultas[1][0]
-    assert consultas[1][1] == (
-        "profissional@farmarbaby.com",
-        "profissional",
+        "DELETE FROM usuarios" not in consulta
+        for consulta, _ in consultas
     )
     assert conexao.commits == 1
     assert conexao.fechada
 
 
-def test_mysql_cadastro_usa_placeholders_e_hash_sem_senha_pura(monkeypatch):
+def test_mysql_cadastro_usa_placeholders_e_hash(monkeypatch):
     conexao = ConexaoSimulada()
     _configurar_mysql(monkeypatch, conexao)
 
@@ -109,14 +103,16 @@ def test_mysql_cadastro_usa_placeholders_e_hash_sem_senha_pura(monkeypatch):
         "senha-forte-123",
     )
 
-    assert sucesso is True
+    assert sucesso
     assert mensagem == "Cadastro realizado com sucesso!"
     consultas = conexao.cursor_simulado.consultas
     insercao = next(
-        (consulta, parametros)
-        for consulta, parametros in consultas
-        if consulta.strip().startswith("INSERT INTO usuarios")
+        item
+        for item in consultas
+        if item[0].strip().startswith("INSERT INTO usuarios")
     )
+    assert "senha_hast" in insercao[0]
+    assert "senha_hash" not in insercao[0]
     assert "%s" in insercao[0]
     assert "?" not in insercao[0]
     assert insercao[1][:4] == (
@@ -125,43 +121,57 @@ def test_mysql_cadastro_usa_placeholders_e_hash_sem_senha_pura(monkeypatch):
         "11987654321",
         "1995-05-10",
     )
-    assert "nome_completo" in insercao[0]
-    assert "data_nascimento" in insercao[0]
-    assert insercao[1][4] != "senha-forte-123"
+    assert banco._conferir_hash("senha-forte-123", insercao[1][4])
+    assert not banco._conferir_hash("senha-incorreta", insercao[1][4])
     assert insercao[1][5] == "gestante"
 
 
-@pytest.mark.parametrize("db_type", [None, "sqlite"])
-def test_db_type_padrao_e_sqlite_fallback(monkeypatch, tmp_path, db_type):
-    if db_type is None:
-        monkeypatch.delenv("DB_TYPE", raising=False)
-    else:
-        monkeypatch.setenv("DB_TYPE", db_type)
-    caminho = str(tmp_path / "fallback.db")
-    monkeypatch.setattr(banco, "CAMINHO_BANCO", caminho)
+def test_mysql_login_usa_senha_hast_e_migra_hash_legado(monkeypatch):
+    conexao = ConexaoSimulada()
+    _configurar_mysql(monkeypatch, conexao)
+    conexao.cursor_simulado.resultado = (
+        "Ana Souza",
+        "ana@example.com",
+        "gestante",
+        "senha-legada",
+    )
 
-    banco.criar_tabelas()
+    usuario = banco.validar_login(
+        "ana@example.com",
+        "senha-legada",
+    )
 
-    with sqlite3.connect(caminho) as conexao:
-        colunas = [
-            linha[1]
-            for linha in conexao.execute("PRAGMA table_info(usuarios)")
-        ]
-    assert colunas == [
-        "id_usuario",
-        "nome_completo",
-        "email",
-        "telefone",
-        "data_nascimento",
-        "senha_hash",
-        "tipo",
-    ]
+    assert usuario == {
+        "nome": "Ana Souza",
+        "email": "ana@example.com",
+        "tipo": "gestante",
+    }
+    consultas = conexao.cursor_simulado.consultas
+    leitura = next(
+        consulta
+        for consulta, _ in consultas
+        if "SELECT nome_completo, email, tipo" in consulta
+    )
+    atualizacao, parametros_atualizacao = next(
+        item
+        for item in consultas
+        if item[0].strip().startswith("UPDATE usuarios")
+    )
+    assert "senha_hast" in leitura
+    assert "senha_hash" not in leitura
+    assert "SET senha_hast = %s" in atualizacao
+    assert "WHERE email = %s AND senha_hast = %s" in atualizacao
+    assert banco._conferir_hash(
+        "senha-legada",
+        parametros_atualizacao[0],
+    )
+    assert parametros_atualizacao[1:] == (
+        "ana@example.com",
+        "senha-legada",
+    )
 
 
-def test_mysql_sem_configuracao_essencial_nao_cai_silenciosamente_em_sqlite(
-    monkeypatch,
-):
-    monkeypatch.setenv("DB_TYPE", "mysql")
+def test_mysql_sem_configuracao_essencial_rejeita_conexao(monkeypatch):
     monkeypatch.delenv("DB_HOST", raising=False)
     monkeypatch.delenv("DB_USER", raising=False)
     monkeypatch.delenv("DB_NAME", raising=False)
@@ -170,8 +180,11 @@ def test_mysql_sem_configuracao_essencial_nao_cai_silenciosamente_em_sqlite(
         banco.criar_tabelas()
 
 
-def test_db_type_invalido_e_rejeitado(monkeypatch):
-    monkeypatch.setenv("DB_TYPE", "postgres")
+def test_mysql_porta_invalida_rejeitada(monkeypatch):
+    monkeypatch.setenv("DB_HOST", "db.example.test")
+    monkeypatch.setenv("DB_USER", "farmar_app")
+    monkeypatch.setenv("DB_NAME", "farmar_baby")
+    monkeypatch.setenv("DB_PORT", "porta")
 
-    with pytest.raises(banco.ErroBanco, match="DB_TYPE"):
+    with pytest.raises(banco.ErroBanco, match="DB_PORT"):
         banco.criar_tabelas()

@@ -6,7 +6,7 @@ import customtkinter as ctk
 import re
 from tkinter import messagebox
 from datetime import datetime
-from base_model import BaseModel
+import banco
 
 
 # Componentes visuais compartilhados evitam duplicar ícones, campos e máscaras.
@@ -21,37 +21,11 @@ from ui_components import (
 CODIGO_PROFISSIONAL_PADRAO = "FARMAR-PRO-2026"
 
 
-class UsuarioModel(BaseModel):
-    """Acesso ao banco específico da operação de cadastro de usuários."""
-
-    def cadastrar_usuario(
-        self,
-        nome: str,
-        email: str,
-        telefone: str,
-        data_nasc: str,
-        senha: str,
-        tipo_perfil: str
-    ) -> int:
-        """Insere uma nova conta usando placeholders para evitar SQL por concatenação."""
-        query = """
-            INSERT INTO usuarios
-            (nome_completo, email, telefone, data_nascimento, senha_hast, tipo)
-            VALUES (%s, %s, %s, %s, %s, %s)
-        """
-
-        return self.execute_query(
-            query,
-            (nome, email, telefone, data_nasc, senha, tipo_perfil)
-        )
-
-
 class TelaCadastro:
     """Constrói e controla a tela de criação de conta para gestantes e profissionais."""
 
     def __init__(self, master):
         # Guarda o modelo de dados e a janela principal para navegação e persistência.
-        self.usuario_model = UsuarioModel()
         self.master = master
 
         # O layout principal usa dois painéis: marca institucional e formulário.
@@ -419,36 +393,23 @@ class TelaCadastro:
                 return
 
         try:
-                    # Converte a data para o formato aceito pelo MySQL
-            data_mysql = datetime.strptime(
-                data_nasc, "%d/%m/%Y"
-            ).strftime("%Y-%m-%d")
-
-            resultado = self.usuario_model.cadastrar_usuario(
+            sucesso, mensagem = banco.cadastrar_usuario(
                 nome,
                 email,
                 telefone,
-                data_mysql,
+                data_nasc,
                 senha,
-                tipo_perfil
+                tipo=tipo_perfil,
             )
+        except banco.ErroBanco as erro:
+            messagebox.showerror("Falha no cadastro", str(erro))
+            return
 
-            print("Usuário cadastrado com sucesso! ID:", resultado)
-
+        if sucesso:
             messagebox.showinfo(
                 "Cadastro",
-                "Cadastro realizado com sucesso!"
+                mensagem + "\nAgora faça o login.",
             )
-
             self.master.abrir_login()
-
-        except Exception as erro:
-            print("\n========== ERRO NO CADASTRO ==========")
-            print("Tipo:", type(erro).__name__)
-            print("Mensagem:", repr(erro))
-            print("======================================")
-
-            messagebox.showerror(
-                "Erro no cadastro",
-                f"{type(erro).__name__}: {erro}"
-            )
+        else:
+            messagebox.showerror("Erro no cadastro", mensagem)

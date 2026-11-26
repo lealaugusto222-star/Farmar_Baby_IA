@@ -1,5 +1,6 @@
 from config_database import DatabaseConnection
 
+
 class BaseModel:
     """Classe base para operações CRUD com gerenciamento seguro de conexão e cursor."""
 

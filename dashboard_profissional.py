@@ -4,7 +4,7 @@ from datetime import date, datetime
 import customtkinter as ctk
 from tkinter import messagebox
 
-# import banco
+import banco
 import dados_locais
 from ui_components import IconEntry, Sidebar, aplicar_mascara_digitos
 
